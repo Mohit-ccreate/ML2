@@ -4,3 +4,8 @@ optionedge/results/*.png
 !optionedge/results/hero.png
 __pycache__/
 *.pyc
+
+# web (React terminal) — build artefacts
+web/node_modules/
+web/dist/
+web/dist-smoke/

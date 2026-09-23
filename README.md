@@ -106,22 +106,29 @@ weeks is the only out-of-sample edge in the project that survives scrutiny.
 
 Nothing here is investment advice; past performance ≠ future results.
 
-## The website (3 pages)
+## The website
 
-`http://localhost:8000` — a dark quant-terminal **app shell** (fixed left
-sidebar, top header, KPI stat cards, local ECharts, no frameworks). The
-sidebar nav (Dashboard · Attention · Predictions · Benchmark · Alpha Straddle ·
-Backtest · Research) scroll-spies the page, the top-bar title follows the
-active section, and a **Light/Dark mode toggle** (persisted in localStorage)
-re-skins every surface and chart. A ticker strip streams the last sessions,
-and a 7-card KPI row leads the dashboard:
+**Primary — `web/` (React 18 + Vite + Tailwind, `http://localhost:5173`)** — a
+Bloomberg-style dark quant terminal, 8 tabs: **Overview** (7 KPI cards,
+searchable/sortable model roster, equity curve), **ViT Attention** (per-head
+8×8 attention spectrogram), **Predictions** (custom OHLCV → live candlestick
+with the ViT's attention heatmap, a ±2% what-if twist slider, a session
+fabricator with 5 market presets, and a batch runner over any date range),
+**Sentiment**, **Option Greeks** (1W ATM chain), **Backtest**, **Benchmarks**
+(dual bars vs the Sherasiya 2025 paper + the label-design check), and
+**Reports** (the honest findings + generated artefacts). Hand-rolled SVG
+charts (no chart CDN), every control styled, all numbers in JetBrains Mono,
+light/dark toggle, and deterministic mock data shaped exactly like the Flask
+API — so swapping to live data is a fetch change, not a rewrite.
 
-**Dashboard** — KPI stat cards (sessions tracked, last signal, honest OOS
-accuracy, OOS Sharpe, top OOS model, alpha-straddle return, NIFTY last close)
-plus a **model roster table**: filter tabs (All / Deep Learning / Tree Models /
-Ensemble), live search, and a sort dropdown (name, in-sample, walk-forward
-OOS, OOS AUC, return, Sharpe) over every model's three-protocol scores and
-backtest stats.
+```bash
+cd web && npm install && npm run dev    # → http://localhost:5173
+npm run smoke                            # SSR-renders all 8 tabs + unit-checks the mock engine
+```
+
+**Legacy — `dashboard/` (Flask, `http://localhost:8000`)** — the original
+no-framework app shell, kept as a zero-JS-toolchain fallback. The same
+`/api/*` routes power both frontends; `web/` proxies `/api` → `:8000` in dev.
 
 **Attention** — hero candlestick chart with the **live ViT attention heatmap**
 pulsing over the patches the network looks at, SELL/HOLD/BUY probability bars,
@@ -175,8 +182,12 @@ optionedge/
   retrain_vit_insample.py  # rebuild only the ViT weights (for the predict panels)
   results/         # state.json (dashboard data), hero.png, vit_insample.pt
 dashboard/
-  app.py           # Flask server (port 8000): app shell + /api/* (predict, predict_range, latest)
-  static/          # quant-terminal app shell (sidebar + light/dark, local ECharts, attention heatmap)
+  app.py           # Flask server (port 8000): /api/* (predict, predict_range, latest, state)
+  static/          # legacy no-framework app shell (fallback UI)
+web/
+  src/App.jsx      # the React terminal — 8 tabs, hand-rolled SVG charts, Tailwind
+  src/mock.js      # deterministic mock data, API-shaped (swap for live fetches later)
+  vite.config.js   # dev server :5173, /api proxy → :8000
 ```
 
 ## Run it
@@ -185,7 +196,8 @@ dashboard/
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python optionedge/train.py         # full: ~40–60 min on 2 CPU cores (charts cached after first run)
 .venv/bin/python optionedge/train.py --fast  # smoke test, ~11 min
-.venv/bin/python dashboard/app.py            # → http://localhost:8000
+.venv/bin/python dashboard/app.py            # API (+ legacy shell) → http://localhost:8000
+cd web && npm install && npm run dev         # React terminal → http://localhost:5173
 # all-in-one (rebuilds the venv if missing, then starts the dashboard):
 ./start.sh
 ```
