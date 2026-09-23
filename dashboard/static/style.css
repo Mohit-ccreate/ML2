@@ -226,3 +226,21 @@ main{max-width:1380px;margin:0 auto;padding:26px 24px 60px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(94,234,255,.18);border-radius:5px}
 ::-webkit-scrollbar-thumb:hover{background:rgba(94,234,255,.35)}
+
+/* ===== predict-your-own-data panel ===== */
+.pred-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;padding:16px 18px}
+.pred-in label{display:block;margin-bottom:8px}
+#predCsv{width:100%;min-height:190px;resize:vertical;background:rgba(4,8,18,.8);color:#a5f3fc;
+  border:1px solid rgba(34,211,238,.25);border-radius:10px;padding:12px;font-size:11.5px;line-height:1.75;outline:none}
+#predCsv:focus{border-color:rgba(34,211,238,.6);box-shadow:0 0 18px rgba(34,211,238,.15)}
+.pred-btns{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.pred-btns .btn{font-family:'JetBrains Mono';font-size:11px;letter-spacing:1px;padding:9px 14px;border-radius:8px;cursor:pointer;
+  background:rgba(34,211,238,.08);color:#22d3ee;border:1px solid rgba(34,211,238,.4);transition:all .2s}
+.pred-btns .btn:hover{background:rgba(34,211,238,.18);box-shadow:0 0 14px rgba(34,211,238,.3)}
+.pred-btns .btn:disabled{opacity:.45;cursor:wait}
+.pred-btns .btn.primary{background:linear-gradient(135deg,#22d3ee,#e879f9);color:#04060e;font-weight:800;border:none}
+.pred-btns .btn.primary:hover{box-shadow:0 0 20px rgba(232,121,249,.5)}
+#predStatus{font-size:10.5px;flex:1;min-width:200px}
+#predStatus.err{color:#ff3b6b}
+.pred-attn-box img{width:100%;display:block;image-rendering:pixelated}
+@media(max-width:900px){.pred-grid{grid-template-columns:1fr}}

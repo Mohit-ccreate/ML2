@@ -1,6 +1,4 @@
-# OptionEdge — heavy generated artifacts (regenerate with optionedge/train.py)
-optionedge/data/charts/
-optionedge/results/*.pt
+# OptionEdge — regenerable artifacts
 optionedge/results/*.log
 optionedge/results/*.png
 !optionedge/results/hero.png

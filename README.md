@@ -123,6 +123,18 @@ sees, where its [CLS] attention is looking (the pulsing grid), its SELL/HOLD/
 BUY probabilities for the next session, and what actually happened the next
 day (`GET /api/predict?date=2023-07-14`).
 
+**Predict your own data (interactive):** paste arbitrary daily OHLC rows
+(`date,open,high,low,close`, ≥26 rows — the last row is the day you're asking
+about) or hit *load latest 60d from NIFTY* and tweak. The server renders your
+input through the *exact* chart renderer the model was trained on, applies the
+*exact* training-time per-image z-score, and runs the saved ViT — returning
+signal, probabilities, the attention heatmap over your chart, and the rendered
+64×64 image the network actually saw (`POST /api/predict` with `{"csv": ...}`,
+plus `GET /api/latest?rows=60` for a CSV-ready tail of the dataset). Note:
+with a short input the EMA/RSI warm-up differs from full history, so
+predictions can drift a few points from the hero signal — the model sees
+exactly the pixels you gave it.
+
 ## Layout
 
 ```
@@ -132,7 +144,8 @@ optionedge/
   models_vit.py    # ViT (from scratch) + LSTM, PyTorch, CPU
   backtest.py      # Black-Scholes ATM option + straddle backtester
   train.py         # full pipeline (3 eval protocols, ensemble, alpha) → results/state.json
-  results/         # state.json (dashboard data), hero.png, model weights
+  retrain_vit_insample.py  # rebuild only the ViT weights (for the predict panels)
+  results/         # state.json (dashboard data), hero.png, vit_insample.pt
 dashboard/
   app.py           # Flask server (port 8000)
   static/          # the quant-terminal UI (local ECharts, attention heatmap)
@@ -145,7 +158,12 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python optionedge/train.py         # full: ~40–60 min on 2 CPU cores (charts cached after first run)
 .venv/bin/python optionedge/train.py --fast  # smoke test, ~11 min
 .venv/bin/python dashboard/app.py            # → http://localhost:8000
+# all-in-one (rebuilds the venv if missing, then starts the dashboard):
+./start.sh
 ```
 
 The dashboard auto-detects a fresh `state.json` (mtime-watched) — just re-run
-`train.py` and refresh the page.
+`train.py` and refresh the page. If only the ViT weights are missing
+(`results/vit_insample.pt`, needed by both interactive predict panels),
+rebuild just those without the full pipeline:
+`.venv/bin/python optionedge/retrain_vit_insample.py` (≈20 min, CPU).

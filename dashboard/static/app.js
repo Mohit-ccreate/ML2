@@ -165,6 +165,70 @@ async function main() {
   pd.addEventListener("change", () => runPredict(pd.value));
   runPredict(pd.value); // pre-fill with the latest session
 
+  /* ---------------- predict: your own OHLC data ---------------- */
+  const predStatusEl = $("#predStatus");
+  function predStatus(msg, err = false) {
+    predStatusEl.textContent = msg;
+    predStatusEl.classList.toggle("err", err);
+  }
+  async function runPredictCsv() {
+    const csv = $("#predCsv").value.trim();
+    if (!csv) { predStatus("paste some OHLC rows first (or hit “load latest 60d”)", true); return; }
+    const btn = $("#predGoBtn");
+    btn.disabled = true;
+    predStatus("rendering your chart → running the ViT…");
+    try {
+      const r = await fetch("/api/predict", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ csv }),
+      });
+      const j = await r.json();
+      if (!j.ok) { predStatus(j.error || "prediction failed", true); return; }
+      const img = $("#predImg");
+      img.src = j.png;
+      img.style.display = "block";
+      const ov = $("#predAttn");
+      ov.innerHTML = "";
+      const maxA = Math.max(...j.attn.flat()) || 1;
+      j.attn.flat().forEach((w, ci) => {
+        const i = document.createElement("i");
+        const a = Math.pow(w / maxA, 0.7);
+        i.style.background = `rgba(232,121,249,${(a * 0.55).toFixed(3)})`;
+        i.style.borderColor = a > 0.5 ? "rgba(232,121,249,.8)" : "transparent";
+        i.style.animationDelay = `${(ci % 8) * 120 + Math.floor(ci / 8) * 80}ms`;
+        ov.appendChild(i);
+      });
+      const badge = $("#predBadge");
+      badge.textContent = j.signal;
+      badge.className = "signal-badge " + j.signal.toLowerCase();
+      const names = ["SELL", "HOLD", "BUY"];
+      const cls = ["s", "h", "b"];
+      $("#predBars").innerHTML = j.probs.map((v, i) =>
+        `<div class="pb ${cls[i]}"><span>${names[i]}</span><div class="bar"><i data-w="${(v * 100).toFixed(1)}"></i></div><span class="v">${(v * 100).toFixed(0)}%</span></div>`
+      ).join("");
+      requestAnimationFrame(() => document.querySelectorAll("#predBars .bar i")
+        .forEach((b) => (b.style.width = b.dataset.w + "%")));
+      $("#predMeta").textContent =
+        `${j.date} · close ${Number(j.close).toLocaleString("en-IN")} · ${j.rows} rows · in-sample ViT`;
+      predStatus(`signal ${j.signal} — S/H/B = ${j.probs.map((v) => (v * 100).toFixed(1)).join(" / ")}%`);
+    } catch (e) {
+      predStatus("request failed: " + e, true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  $("#predGoBtn").addEventListener("click", runPredictCsv);
+  $("#predLoadBtn").addEventListener("click", async () => {
+    predStatus("loading latest NIFTY sessions…");
+    try {
+      const j = await (await fetch("/api/latest?rows=60")).json();
+      $("#predCsv").value = j.csv;
+      predStatus(`${j.rows} rows loaded (ends ${j.date}) — hit PREDICT`);
+    } catch (e) {
+      predStatus("could not load latest data: " + e, true);
+    }
+  });
+
   /* ---------------- KPIs ---------------- */
   const kf = ens["walk-forward OOS"];
   const ebt = BT["Ensemble"];

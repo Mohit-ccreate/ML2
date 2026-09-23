@@ -98,6 +98,38 @@
   </div>
 </section>
 
+<!-- ======= INTERACTIVE PREDICT: YOUR OWN DATA ======= -->
+<section class="card section">
+  <div class="card-title"><span class="tag">INTERACTIVE</span> Predict your own data — feed the ViT arbitrary OHLC <span class="title-note">paste daily bars → exact training chart renderer → live signal + attention</span></div>
+  <div class="pred-grid">
+    <div class="pred-in">
+      <label class="mono dim" for="predCsv">one row per day: <b>date,open,high,low,close</b> · ≥26 rows · last row = the day you're asking about</label>
+      <textarea id="predCsv" rows="10" class="mono" spellcheck="false"
+        placeholder="2026-04-01,24100.5,24250.0,23980.0,24180.5&#10;2026-04-02,24180.5,24320.0,24090.0,24210.0&#10;..."></textarea>
+      <div class="pred-btns">
+        <button id="predLoadBtn" class="btn">⤓ load latest 60d from NIFTY</button>
+        <button id="predGoBtn" class="btn primary">▶ PREDICT MY DATA</button>
+        <span id="predStatus" class="mono dim">paste rows (or load latest), then PREDICT</span>
+      </div>
+    </div>
+    <div class="pred-out">
+      <div class="attn-box pred-attn-box">
+        <img id="predImg" alt="the chart the ViT will see" style="display:none;image-rendering:pixelated">
+        <div class="attn-overlay" id="predAttn"></div>
+        <div class="attn-legend">
+          <div>ViT attention on <i>your</i> input</div>
+          <div class="attn-scale"><span>low</span><i></i><span>high</span></div>
+        </div>
+      </div>
+      <div class="signal-row">
+        <div class="signal-badge" id="predBadge">—</div>
+        <div class="prob-bars" id="predBars"></div>
+        <div class="hero-meta mono" id="predMeta">waiting for input…</div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ======= VS PAPER ======= -->
 <section class="card section">
   <div class="card-title"><span class="tag">BENCHMARK</span> OptionEdge vs the Reference Paper <span class="title-note">(Sherasiya 2025, IJFMR)</span></div>

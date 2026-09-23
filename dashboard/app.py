@@ -139,7 +139,9 @@ def predict():
         if not cp.exists():
             render_chart(raw, int(pos[k]), cp)
         x = load_image(cp)
-        x = ((x - x.mean()) / (x.std() + 1e-3)).astype(np.float32)
+        # exact training-time normalisation: per-image, per-channel z-score
+        x = ((x - x.mean(axis=(1, 2), keepdims=True))
+             / (x.std(axis=(1, 2), keepdims=True) + 1e-3)).astype(np.float32)
         xt = torch.tensor(x).unsqueeze(0)
 
         with torch.no_grad():
@@ -165,6 +167,101 @@ def predict():
     except FileNotFoundError as e:
         return jsonify({"error": "ViT weights (results/vit_insample.pt) are missing - "
                                  "re-running the pipeline will regenerate them. Try again shortly."}), 503
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": f"predict failed: {e}"}), 500
+
+
+# --------------------------------------------------------------------------- #
+# interactive prediction: user-supplied OHLC (arbitrary data)
+# --------------------------------------------------------------------------- #
+@app.get("/api/latest")
+def api_latest():
+    """Last N daily OHLC rows of the training dataset, CSV-ready for the
+    paste-box (date,open,high,low,close per line)."""
+    from data import make_dataset
+    try:
+        n = max(26, min(int(request.args.get("rows", 60)), 250))
+    except ValueError:
+        n = 60
+    ds = make_dataset()
+    d = ds.tail(n)
+    lines = [f"{idx.date()},{r.open},{r.high},{r.low},{r.close}"
+             for idx, r in d.iterrows()]
+    return jsonify({"csv": "\n".join(lines), "date": str(d.index[-1].date()), "rows": len(lines)})
+
+
+@app.post("/api/predict")
+def api_predict_csv():
+    """User-supplied daily OHLC -> rendered chart -> ViT -> SELL/HOLD/BUY +
+    attention map. JSON: {"csv": "date,open,high,low,close\\n..."}."""
+    data = request.get_json(force=True, silent=True) or {}
+    csv = (data.get("csv") or "").strip()
+    if not csv:
+        return jsonify({"error": "no input - paste OHLC rows (date,open,high,low,close)"}), 400
+
+    rows = []
+    for line in csv.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = [x.strip() for x in line.replace(";", ",").split(",")]
+        if parts[0].lower() in ("date", "d"):
+            continue  # optional header
+        if len(parts) < 5:
+            return jsonify({"error": f"row needs date,open,high,low,close -> {line!r}"}), 400
+        try:
+            rows.append((parts[0], float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])))
+        except ValueError:
+            return jsonify({"error": f"bad number in row -> {line!r}"}), 400
+    if len(rows) < 26:
+        return jsonify({"error": f"need at least 26 daily rows (15-candle chart window + indicator warm-up), got {len(rows)}"}), 400
+
+    try:
+        import numpy as np
+        import pandas as pd
+        import torch
+        import tempfile
+        from pathlib import Path
+
+        from charts import load_image, render_chart
+
+        df = pd.DataFrame(rows, columns=["date", "Open", "High", "Low", "Close"])
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+        if df["date"].isna().any():
+            return jsonify({"error": "a date could not be parsed"}), 400
+        df = df.set_index("date").sort_index()
+        df = df[~df.index.duplicated(keep="last")]
+
+        ctx = _predict_ctx()
+        model = ctx["model"]
+        last = len(df) - 1
+        with tempfile.TemporaryDirectory() as td:
+            png_path = Path(td) / "input_chart.png"
+            render_chart(df, last, png_path)
+            png_bytes = png_path.read_bytes()
+            x = load_image(png_path)
+        # exact training-time normalisation: per-image, per-channel z-score
+        x = ((x - x.mean(axis=(1, 2), keepdims=True))
+             / (x.std(axis=(1, 2), keepdims=True) + 1e-3)).astype(np.float32)
+        xt = torch.tensor(x).unsqueeze(0)
+
+        model.eval()
+        with torch.no_grad():
+            p = torch.softmax(model(xt), dim=1).numpy()[0]
+            attn = model.cls_attention(xt)[0]
+
+        return jsonify({
+            "ok": True,
+            "date": str(df.index[-1].date()),
+            "close": round(float(df["Close"].iloc[-1]), 2),
+            "rows": len(df),
+            "signal": ["SELL", "HOLD", "BUY"][int(p.argmax())],
+            "probs": [round(float(v), 4) for v in p],
+            "attn": [[round(float(v), 4) for v in r] for r in attn.tolist()],
+            "png": "data:image/png;base64," + base64.b64encode(png_bytes).decode(),
+        })
+    except (RuntimeError, FileNotFoundError) as e:
+        return jsonify({"error": str(e) or "ViT weights missing - retrain still running"}), 503
     except Exception as e:  # noqa: BLE001
         return jsonify({"error": f"predict failed: {e}"}), 500
 
