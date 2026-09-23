@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OptionEdge — Vision Transformer Options Terminal · NIFTY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="/echarts.min.js"></script>
+<script>window.echarts || document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="bg-aurora" aria-hidden="true"></div>
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="scanline" aria-hidden="true"></div>
+
+<!-- ======= NAV ======= -->
+<header class="nav">
+  <div class="nav-left">
+    <div class="logo">OPTION<span>EDGE</span></div>
+    <div class="logo-sub">VIT OPTIONS TERMINAL · NIFTY 50</div>
+  </div>
+  <div class="nav-right">
+    <div class="pill"><span class="dot"></span> MODEL ONLINE</div>
+    <div class="pill mono" id="generated">—</div>
+  </div>
+</header>
+
+<!-- ======= TICKER ======= -->
+<div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
+
+<main>
+<!-- ======= HERO ======= -->
+<section class="hero">
+  <div class="hero-left card glow">
+    <div class="card-title"><span class="tag">VISION TRANSFORMER</span> Live Attention Feed</div>
+    <div class="attn-box">
+      <img id="heroImg" src="/hero.png" alt="NIFTY chart the ViT is seeing">
+      <div class="attn-overlay" id="attnOverlay"></div>
+      <div class="attn-legend">
+        <div>attention heat — where the ViT looks</div>
+        <div class="attn-scale"><span>low</span><i></i><span>high</span></div>
+      </div>
+    </div>
+    <div class="signal-row">
+      <div class="signal-badge" id="sigBadge">—</div>
+      <div class="prob-bars" id="probBars"></div>
+      <div class="hero-meta mono" id="heroMeta">—</div>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <h1 class="hero-h1">
+      The market sees charts.<br>
+      <span class="grad">Our ViT learns them.</span>
+    </h1>
+    <p class="hero-p">
+      OptionEdge renders NIFTY 50 price action into candlestick images and trains a
+      <b>Vision Transformer built from scratch</b> to read them — stacked with LSTM,
+      XGBoost &amp; Random Forest, then backtested in real Black-Scholes ATM options.
+      Walk-forward validated, no lookahead, no leak.
+    </p>
+    <div class="kpi-grid" id="kpiGrid"></div>
+  </div>
+</section>
+
+<!-- ======= INTERACTIVE PREDICT ======= -->
+<section class="card section">
+  <div class="card-title"><span class="tag">INTERACTIVE</span> ViT Time Machine — pick any session, see what the ViT predicts <span class="title-note">live inference on the saved in-sample model</span></div>
+  <div class="vs-grid">
+    <div class="card inner-card">
+      <div class="inner-title">⌕ Ask the ViT about any day</div>
+      <div class="predict-controls mono">
+        <label for="predictDate">SESSION DATE</label>
+        <input type="date" id="predictDate">
+        <button id="predictBtn">RUN ViT →</button>
+      </div>
+      <div class="predict-out" id="predictOut">
+        <div class="predict-img-wrap empty" id="predictWrap">
+          <img id="predictImg" alt="the 64×64 chart the ViT sees" src="data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=">
+          <div class="ph" id="predictPh">PICK A DATE →</div>
+          <div class="attn-overlay" id="predictAttn"></div>
+        </div>
+        <div class="predict-side">
+          <div class="signal-badge hold" id="predictBadge">—</div>
+          <div class="prob-bars" id="predictBars"></div>
+          <div class="hero-meta mono" id="predictMeta">—</div>
+          <div class="hero-meta mono" id="predictActual">—</div>
+        </div>
+      </div>
+    </div>
+    <div class="card inner-card">
+      <div class="inner-title">What you're looking at</div>
+      <p class="dim">The left image is the exact 64×64 candlestick render the ViT receives for that session — candles, EMA9/21 ribbon and RSI strip, z-scored per day. The pulsing purple grid is the [CLS] token's attention over the 8×8 patch grid: <b>where the model is looking</b>. The three bars are its SELL / HOLD / BUY probabilities for the <b>next</b> session.</p>
+      <p class="dim">Honesty corner: this runs the in-sample fit, so recent dates look confident by construction. The walk-forward OOS panels below show what honest generalisation looks like — direction is ~chance, and the vol-expansion straddle is the keep.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======= VS PAPER ======= -->
+<section class="card section">
+  <div class="card-title"><span class="tag">BENCHMARK</span> OptionEdge vs the Reference Paper <span class="title-note">(Sherasiya 2025, IJFMR)</span></div>
+  <div class="vs-grid">
+    <div class="chart-box"><div class="chart" id="chartVsPaper"></div></div>
+    <div class="vs-right">
+      <div class="card inner-card">
+        <div class="inner-title">⚠ Why the paper's 90% isn't comparable</div>
+        <p id="labelNote" class="dim"></p>
+        <div class="duo">
+          <div class="duo-item"><div class="duo-num" id="paperLabelAcc">—</div><div class="duo-lbl">paper-style label, our XGBoost</div></div>
+          <div class="duo-item"><div class="duo-num" id="majorityAcc">—</div><div class="duo-lbl">majority-class baseline (no model!)</div></div>
+          <div class="duo-item"><div class="duo-num" id="wfAcc">—</div><div class="duo-lbl">our ensemble, honest walk-forward</div></div>
+        </div>
+      </div>
+      <div class="card inner-card">
+        <div class="inner-title">Three protocols, three honest numbers</div>
+        <table class="mini-table" id="protoTable"></table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======= ALPHA ======= -->
+<section class="card section glow-card">
+  <div class="card-title"><span class="tag" style="background:linear-gradient(90deg,var(--mag),var(--cyan))">OPTIONEDGE ALPHA</span> Vol-Expansion Straddle Strategy <span class="title-note" id="alphaPeriod"></span></div>
+  <div class="vs-grid">
+    <div class="chart-box"><div class="chart tall" id="chartAlpha"></div></div>
+    <div class="vs-right">
+      <div class="kpi-grid alpha-kpis" id="alphaKpis"></div>
+      <div class="card inner-card">
+        <div class="inner-title">How it works</div>
+        <p class="dim" style="font-size:13px;line-height:1.6" id="alphaHow"></p>
+      </div>
+      <div class="card inner-card">
+        <div class="inner-title">Per-year OOS accuracy vs base rate</div>
+        <div class="chart short" id="chartAlphaYear"></div>
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap" style="margin-top:18px"><table class="trades" id="alphaTrades"></table></div>
+</section>
+
+<!-- ======= EQUITY ======= -->
+<section class="card section">
+  <div class="card-title"><span class="tag">BACKTEST</span> Directional 1-Day Models — Walk-Forward OOS <span class="title-note" id="wfPeriod"></span></div>
+  <div class="chart tall" id="chartEquity"></div>
+  <div class="chart short" id="chartDD"></div>
+</section>
+
+<!-- ======= MODEL CARDS ======= -->
+<section class="section">
+  <div class="section-head"><h2 class="h2">Model Roster</h2><span class="dim mono" id="modelSub"></span></div>
+  <div class="model-grid" id="modelGrid"></div>
+</section>
+
+<!-- ======= MONTHLY + FEATURES ======= -->
+<section class="card section">
+  <div class="vs-grid">
+    <div>
+      <div class="card-title"><span class="tag">P&L</span> Monthly Returns — Ensemble (OOS)</div>
+      <div class="chart" id="chartMonthly"></div>
+    </div>
+    <div>
+      <div class="card-title"><span class="tag">X-RAY</span> Feature Importance — XGBoost</div>
+      <div class="chart" id="chartFeatures"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======= VIT ANATOMY ======= -->
+<section class="card section">
+  <div class="card-title"><span class="tag">MACHINE</span> ViT Anatomy <span class="title-note" id="vitMeta"></span></div>
+  <div class="arch">
+    <div class="arch-step"><div class="arch-ic">🖼</div><div class="arch-name">64×64<br>chart</div></div>
+    <div class="arch-arrow">▸</div>
+    <div class="arch-step"><div class="arch-ic">▦</div><div class="arch-name">64 patches<br>(8×8)</div></div>
+    <div class="arch-arrow">▸</div>
+    <div class="arch-step"><div class="arch-ic">⧉</div><div class="arch-name">linear<br>embed → 192d</div></div>
+    <div class="arch-arrow">▸</div>
+    <div class="arch-step pulse"><div class="arch-ic">🧠</div><div class="arch-name">[CLS] + 65 tokens<br>4× transformer<br>6 heads, pre-LN</div></div>
+    <div class="arch-arrow">▸</div>
+    <div class="arch-step"><div class="arch-ic">∿</div><div class="arch-name">mean pool<br>+ head</div></div>
+    <div class="arch-arrow">▸</div>
+    <div class="arch-step"><div class="arch-ic">🎯</div><div class="arch-name">SELL /<br>HOLD / BUY</div></div>
+  </div>
+</section>
+
+<!-- ======= TRADES ======= -->
+<section class="card section">
+  <div class="card-title"><span class="tag">TICKER TAPE</span> Recent Ensemble Trades <span class="title-note">(last 90)</span></div>
+  <div class="table-wrap"><table class="trades" id="tradesTable"></table></div>
+</section>
+
+<!-- ======= METHOD ======= -->
+<section class="card section">
+  <div class="card-title"><span class="tag">METHOD</span> How it works — and what we refuse to fake</div>
+  <div class="method-grid">
+    <div class="method-item"><h4>1 · Data</h4><p id="mData" class="dim"></p></div>
+    <div class="method-item"><h4>2 · Vision</h4><p class="dim">Each day becomes a 64×64 candlestick image (candles, EMA9/21 ribbon, RSI strip). The ViT never sees raw numbers — only the chart, like a human trader.</p></div>
+    <div class="method-item"><h4>3 · Labels</h4><p id="mLabel" class="dim"></p></div>
+    <div class="method-item"><h4>4 · Validation</h4><p class="dim">Expanding walk-forward: train on everything before the year, test on that year (2020→2026). The model has never seen its test days. Ensemble stack fits on train-side probabilities only.</p></div>
+    <div class="method-item"><h4>5 · Backtest</h4><p id="mBt" class="dim"></p></div>
+    <div class="method-item"><h4>6 · Honesty</h4><p class="dim">In-sample fit (what papers usually report), a fair 80/20 time split, <b>and</b> walk-forward OOS — all shown. No cherry-picking, no lookahead, no survivorship. Past performance ≠ future results.</p></div>
+  </div>
+</section>
+</main>
+
+<footer class="foot mono">
+  OptionEdge · NIFTY 50 index options · data: NSE via Yahoo Finance mirror (2007–2026) ·
+  ViT implemented from scratch in PyTorch · educational research, not investment advice
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
