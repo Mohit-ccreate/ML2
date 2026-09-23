@@ -108,46 +108,60 @@ Nothing here is investment advice; past performance ≠ future results.
 
 ## The website (3 pages)
 
-`http://localhost:8000` — a dark quant-terminal UI (ECharts, no frameworks),
-split across three pages (top nav):
+`http://localhost:8000` — a dark quant-terminal **app shell** (fixed left
+sidebar, top header, KPI stat cards, local ECharts, no frameworks). The
+sidebar nav (Dashboard · Attention · Predictions · Benchmark · Alpha Straddle ·
+Backtest · Research) scroll-spies the page, the top-bar title follows the
+active section, and a **Light/Dark mode toggle** (persisted in localStorage)
+re-skins every surface and chart. A ticker strip streams the last sessions,
+and a 7-card KPI row leads the dashboard:
 
-**`/` — TERMINAL.** Scroll-revealed sections, animated KPI counters, a hero
-candlestick chart with the **live ViT attention heatmap** pulsing over the
-patches the network looks at, probability bars for the model's current-day
-signal, per-model cards with in-sample / paper-style / walk-forward OOS rows
-and OOS backtest stats, the vs-paper comparison chart, the three-protocol
-table, equity curves vs Buy & Hold, drawdown, monthly P&L heat strip, feature
-importance, and per-trade logs for both the directional ensemble and the
-straddle alpha.
+**Dashboard** — KPI stat cards (sessions tracked, last signal, honest OOS
+accuracy, OOS Sharpe, top OOS model, alpha-straddle return, NIFTY last close)
+plus a **model roster table**: filter tabs (All / Deep Learning / Tree Models /
+Ensemble), live search, and a sort dropdown (name, in-sample, walk-forward
+OOS, OOS AUC, return, Sharpe) over every model's three-protocol scores and
+backtest stats.
 
-**`/predict` — PLAYGROUND.** One page, four ways to feed the live ViT:
+**Attention** — hero candlestick chart with the **live ViT attention heatmap**
+pulsing over the patches the network looks at, SELL/HOLD/BUY probability bars,
+and the in-sample KPI grid.
 
-* **Time Machine** — pick *any* session date (or 🎲 a random one / latest) and
-  it shows the exact 64×64 chart the model sees, where its [CLS] attention is
-  looking, its SELL/HOLD/BUY probabilities, and what actually happened the
-  next day (`GET /api/predict?date=2023-07-14`).
-* **Paste / Upload** — your own daily OHLC rows (`date,open,high,low,close`,
-  ≥26 rows — last row is the prediction day) via textarea or CSV file upload;
-  a *what-if* slider twists the final close ±2% (adjusting high/low to match)
-  and re-predicts live. The server renders your input through the *exact*
-  chart renderer the model was trained on, applies the *exact* training-time
-  per-image z-score, and runs the saved ViT (`POST /api/predict` with
-  `{"csv": ...}`, plus `GET /api/latest?rows=60` for a CSV-ready tail).
-* **Scenario generator** — fabricate 40 sessions (steady up / down, spike,
-  chop, random walk) and ask the model about the end of a path that never
-  existed.
-* **Batch sweep** — pick a from→to range (≤60 sessions) and get a table of
-  signal vs. actual for every day in it, with an exact-hit rate that shows
-  you the model's real daily skill on that stretch (`POST /api/predict_range`).
+**Predictions** — one page, four input modes (tabbed):
+
+* **Time Machine** — pick *any* session date and it shows the exact 64×64
+  chart the model sees, where its [CLS] attention is looking, its
+  SELL/HOLD/BUY probabilities, and what actually happened the next day
+  (`GET /api/predict?date=2023-07-14`).
+* **Your Data** — your own daily OHLC rows (`date,open,high,low,close`,
+  ≥26 rows — last row is the prediction day) via textarea, CSV file upload,
+  or *load latest 60d*; a **what-if twist slider** reprices the final close
+  ±2% (adjusting high/low) and re-predicts live. The server renders your
+  input through the *exact* chart renderer the model was trained on and
+  applies the *exact* training-time per-image z-score (`POST /api/predict`
+  with `{"csv": ...}`, plus `GET /api/latest?rows=60`).
+* **Scenarios** — fabricate 40 sessions (steady up / down, vol spike, chop,
+  random walk) and ask the model about the end of a path that never existed.
+* **Batch Sweep** — from→to range (≤60 sessions) → table of signal vs actual
+  per day with an exact-hit rate (`POST /api/predict_range`).
+
+**Benchmark** — OptionEdge vs the reference paper: the label-design check
+(92.8% model vs 87.1% majority baseline), the in-sample comparison chart,
+and the three-protocol table.
+
+**Alpha Straddle** — the vol-expansion strategy that survives: KPIs, equity
+vs baselines, per-year OOS accuracy, and the trade log.
+
+**Backtest** — walk-forward OOS equity curves vs Buy & Hold and RSI momentum,
+drawdown, monthly P&L heat strip, XGBoost feature importance, and the recent
+ensemble trades.
+
+**Research** — method grid: data, vision, labels, validation, backtest, and
+what we refuse to fake.
 
 Note: with a short input the EMA/RSI warm-up differs from full history, so
 predictions can drift a few points from the hero signal — the model sees
 exactly the pixels you gave it.
-
-**`/research` — RESEARCH.** The honest numbers: the four findings (paper
-label design, in-sample overfitting, walk-forward at chance, the straddle
-alpha that survives) plus the method grid — data, features, models, labels,
-protocols, cost model — with live figures pulled from `state.json`.
 
 ## Layout
 
@@ -161,8 +175,8 @@ optionedge/
   retrain_vit_insample.py  # rebuild only the ViT weights (for the predict panels)
   results/         # state.json (dashboard data), hero.png, vit_insample.pt
 dashboard/
-  app.py           # Flask server (port 8000): /, /predict, /research + /api/*
-  static/          # 3-page quant-terminal UI (local ECharts, attention heatmap)
+  app.py           # Flask server (port 8000): app shell + /api/* (predict, predict_range, latest)
+  static/          # quant-terminal app shell (sidebar + light/dark, local ECharts, attention heatmap)
 ```
 
 ## Run it

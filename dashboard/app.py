@@ -35,18 +35,14 @@ def _state() -> dict:
 
 
 @app.get("/")
-def index():
-    return send_from_directory(HERE / "static", "index.html")
-
-
 @app.get("/predict")
-def predict_page():
-    return send_from_directory(HERE / "static", "predict.html")
-
-
+@app.get("/playground")
+@app.get("/backtest")
+@app.get("/alpha")
 @app.get("/research")
-def research_page():
-    return send_from_directory(HERE / "static", "research.html")
+def index():
+    """Single-page shell — JS activates the section from the URL/path."""
+    return send_from_directory(HERE / "static", "index.html")
 
 
 @app.get("/api/state")
