@@ -39,6 +39,16 @@ def index():
     return send_from_directory(HERE / "static", "index.html")
 
 
+@app.get("/predict")
+def predict_page():
+    return send_from_directory(HERE / "static", "predict.html")
+
+
+@app.get("/research")
+def research_page():
+    return send_from_directory(HERE / "static", "research.html")
+
+
 @app.get("/api/state")
 def api_state():
     return jsonify(_state())
@@ -111,19 +121,52 @@ def _predict_ctx() -> dict:
     return _PRED
 
 
+def _predict_at(ctx: dict, k: int, with_chart: bool = True) -> dict:
+    """Core single-session ViT inference at dataset position k."""
+    import numpy as np
+    import pandas as pd
+    import torch
+
+    from charts import chart_path_for, load_image, render_chart
+
+    ds, raw, pos, model = ctx["ds"], ctx["raw"], ctx["pos"], ctx["model"]
+    d = ds.index[k]
+    cp = chart_path_for(d)
+    if not cp.exists():
+        render_chart(raw, int(pos[k]), cp)
+    x = load_image(cp)
+    # exact training-time normalisation: per-image, per-channel z-score
+    x = ((x - x.mean(axis=(1, 2), keepdims=True))
+         / (x.std(axis=(1, 2), keepdims=True) + 1e-3)).astype(np.float32)
+    xt = torch.tensor(x).unsqueeze(0)
+    with torch.no_grad():
+        p = torch.softmax(model(xt), dim=1).numpy()[0]
+        attn = model.cls_attention(xt)[0]
+    row = ds.iloc[k]
+    nxt = row.get("next_ret")
+    out = {
+        "date": str(d.date()),
+        "close": round(float(row["close"]), 1),
+        "probs": [round(float(v), 4) for v in p],
+        "signal": ["SELL", "HOLD", "BUY"][int(p.argmax())],
+        "attention": [[round(float(v), 4) for v in r] for r in attn],
+    }
+    if with_chart:
+        out["chart_b64"] = base64.b64encode(cp.read_bytes()).decode()
+    if nxt is not None and pd.notna(nxt):
+        out["next_ret_pct"] = round(float(nxt) * 100, 3)
+        out["actual"] = ["SELL", "HOLD", "BUY"][int(row["y3"])]
+    return out
+
+
 @app.get("/api/predict")
 def predict():
     date = request.args.get("date") or None
     try:
-        import numpy as np
         import pandas as pd
-        import torch
 
         ctx = _predict_ctx()  # also puts optionedge/ on sys.path
-        from charts import chart_path_for, load_image, render_chart
-
-        ds, raw, pos, model = ctx["ds"], ctx["raw"], ctx["pos"], ctx["model"]
-
+        ds = ctx["ds"]
         if date:
             ts = pd.Timestamp(date)
             k = ds.index.searchsorted(ts)
@@ -132,36 +175,7 @@ def predict():
                                          f"({ds.index[0].date()} .. {ds.index[-1].date()})"}), 404
         else:
             k = len(ds) - 1
-        d = ds.index[k]
-
-        # chart the ViT will see (from cache, or render on the fly)
-        cp = chart_path_for(d)
-        if not cp.exists():
-            render_chart(raw, int(pos[k]), cp)
-        x = load_image(cp)
-        # exact training-time normalisation: per-image, per-channel z-score
-        x = ((x - x.mean(axis=(1, 2), keepdims=True))
-             / (x.std(axis=(1, 2), keepdims=True) + 1e-3)).astype(np.float32)
-        xt = torch.tensor(x).unsqueeze(0)
-
-        with torch.no_grad():
-            p = torch.softmax(model(xt), dim=1).numpy()[0]
-            attn = model.cls_attention(xt)[0]
-
-        row = ds.iloc[k]
-        nxt = row.get("next_ret")
-        out = {
-            "date": str(d.date()),
-            "close": round(float(row["close"]), 1),
-            "probs": [round(float(v), 4) for v in p],
-            "signal": ["SELL", "HOLD", "BUY"][int(p.argmax())],
-            "attention": [[round(float(v), 4) for v in r] for r in attn],
-            "chart_b64": base64.b64encode(cp.read_bytes()).decode(),
-        }
-        if nxt is not None and pd.notna(nxt):
-            out["next_ret_pct"] = round(float(nxt) * 100, 3)
-            out["actual"] = ["SELL", "HOLD", "BUY"][int(row["y3"])]
-        return jsonify(out)
+        return jsonify(_predict_at(ctx, k))
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 503
     except FileNotFoundError as e:
@@ -169,6 +183,51 @@ def predict():
                                  "re-running the pipeline will regenerate them. Try again shortly."}), 503
     except Exception as e:  # noqa: BLE001
         return jsonify({"error": f"predict failed: {e}"}), 500
+
+
+@app.post("/api/predict_range")
+def predict_range():
+    """Batch: every trading day in [from, to] (max 60). Returns per-day
+    predictions + a hit-rate summary vs the actual next-day labels."""
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        import pandas as pd
+
+        ctx = _predict_ctx()
+        ds = ctx["ds"]
+        frm = pd.Timestamp(data.get("from") or ds.index[0])
+        to = pd.Timestamp(data.get("to") or ds.index[-1])
+        if frm > to:
+            frm, to = to, frm
+        sel = ds.index[(ds.index >= frm) & (ds.index <= to)]
+        if len(sel) < 2:
+            return jsonify({"error": f"no trading days in {frm.date()} .. {to.date()} "
+                                     f"(dataset {ds.index[0].date()} .. {ds.index[-1].date()})"}), 404
+        if len(sel) > 60:
+            return jsonify({"error": f"{len(sel)} days - max 60 sessions per batch, pick a smaller range"}), 400
+        rows = []
+        hits = graded = 0
+        for d in sel:
+            k = int(ds.index.get_loc(d))
+            r = _predict_at(ctx, k, with_chart=False)
+            r.pop("attention", None)
+            if "actual" in r:
+                graded += 1
+                hits += int(r["signal"] == r["actual"])
+            rows.append(r)
+        return jsonify({
+            "n": len(rows), "days": rows,
+            "summary": {
+                "graded": graded,
+                "exact_hit": hits,
+                "exact_hit_pct": round(100.0 * hits / graded, 1) if graded else None,
+                "note": "exact 3-class hit rate vs actual next-day label",
+            },
+        })
+    except (RuntimeError, FileNotFoundError) as e:
+        return jsonify({"error": str(e) or "ViT weights missing"}), 503
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": f"range predict failed: {e}"}), 500
 
 
 # --------------------------------------------------------------------------- #
