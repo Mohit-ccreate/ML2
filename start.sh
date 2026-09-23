@@ -2,7 +2,7 @@
 # One-command OptionEdge dashboard startup (survives sandbox restarts, which
 # wipe the Python venv). Rebuilds the venv if missing, then starts the server.
 set -e
-VENV=/home/user/.venv
+VENV="$(dirname "$0")/.venv"
 cd "$(dirname "$0")"
 
 if [ ! -x "$VENV/bin/python" ]; then

@@ -9,3 +9,6 @@ __pycache__/
 web/node_modules/
 web/dist/
 web/dist-smoke/
+
+# python venv (rebuilt by start.sh if missing)
+.venv/
