@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 
 HERE = Path(__file__).parent
 PROJECT = HERE.parent
@@ -112,7 +112,8 @@ def _predict_ctx() -> dict:
 
 
 @app.get("/api/predict")
-def predict(date: str | None = None):
+def predict():
+    date = request.args.get("date") or None
     try:
         import numpy as np
         import pandas as pd

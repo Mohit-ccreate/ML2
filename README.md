@@ -117,6 +117,12 @@ vs-paper comparison chart, the three-protocol table, equity curves vs
 Buy & Hold, drawdown, monthly P&L heat strip, feature importance, and
 per-trade logs for both the directional ensemble and the straddle alpha.
 
+**ViT Time Machine (interactive):** pick *any* session date and the dashboard
+runs the saved in-sample ViT live — it shows the exact 64×64 chart the model
+sees, where its [CLS] attention is looking (the pulsing grid), its SELL/HOLD/
+BUY probabilities for the next session, and what actually happened the next
+day (`GET /api/predict?date=2023-07-14`).
+
 ## Layout
 
 ```
