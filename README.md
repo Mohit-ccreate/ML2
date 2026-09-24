@@ -88,7 +88,11 @@ NIFTY are fatter than Parkinson-IV-implied ranges (real |5d moves| average
 ~1.76% vs ~1.73% implied). A walk-forward XGBoost model of
 "will the next 5-day move exceed the IV-implied range?" reaches
 **0.570 AUC** (53.9% accuracy vs 46.2% base rate) strictly out-of-sample,
-year by year (AUC 0.48–0.67 across 2020–2026). Traded as a fixed-₹10,000
+year by year (AUC 0.48–0.67 across 2020–2026). Adding **India VIX** — NSE's
+index computed from the NIFTY 50 option chain itself — as features lifts the
+walk-forward AUC to **~0.585–0.59 with a positive lift in every year**
+(`optionedge/vix_experiment.py`; the pipeline picks the VIX columns up
+automatically from `optionedge/data/chain/INDIAVIX.csv`). Traded as a fixed-₹10,000
 long ATM straddle on vol-expansion days (5-day hold, Black-Scholes entry,
 intrinsic-value exit, 0.25% slippage, OOS 2020→2026):
 
@@ -174,13 +178,15 @@ exactly the pixels you gave it.
 
 ```
 optionedge/
-  data.py          # NSE NIFTY OHLC → 29 features + labels (3-class & paper-style)
+  data.py          # NSE NIFTY OHLC → 29 price features + 7 India-VIX chain features + labels
+  vix_experiment.py  # A/B: chain-IV features vs price-only (walk-forward OOS)
+  results/         # state.json (dashboard data), hero.png, vit_insample.pt
+  data/chain/      # INDIAVIX.csv — India VIX daily history (2020-08 → 2026-07)
   charts.py        # renders the 15-day candlestick image the ViT sees (+ hero chart)
   models_vit.py    # ViT (from scratch) + LSTM, PyTorch, CPU
   backtest.py      # Black-Scholes ATM option + straddle backtester
   train.py         # full pipeline (3 eval protocols, ensemble, alpha) → results/state.json
   retrain_vit_insample.py  # rebuild only the ViT weights (for the predict panels)
-  results/         # state.json (dashboard data), hero.png, vit_insample.pt
 dashboard/
   app.py           # Flask server (port 8000): /api/* (predict, predict_range, latest, state)
   static/          # legacy no-framework app shell (fallback UI)

@@ -38,7 +38,8 @@ from backtest import (INITIAL, STAKE_FRAC, atm_price, buy_and_hold, performance,
                       run_backtest, rsi_strategy)
 from charts import (CACHE, IMG, chart_path_for, load_image, render_chart,  # noqa: E402
                     render_hero)
-from data import FEATURES, LABEL_THR, load_raw, make_dataset  # noqa: E402
+from data import (ALL_FEATURES, FEATURES, LABEL_THR, VIX_AVAILABLE,
+                 load_raw, make_dataset)  # noqa: E402
 from models_vit import LSTMModel, ViT  # noqa: E402
 
 torch.set_num_threads(2)
@@ -394,13 +395,15 @@ def main() -> None:
     ds = make_dataset()
     raw = load_raw()
     pos = np.searchsorted(raw.index.values, ds.index.values)
-    X = ds[FEATURES].to_numpy(dtype=float)
+    X = ds[ALL_FEATURES].to_numpy(dtype=float)
     y = ds["y3"].to_numpy(dtype=int)
     y_s = pd.Series(y, index=ds.index)
     n = len(ds)
     bc = np.bincount(y) / n
     log(f"dataset: {n} rows  {ds.index[0].date()} -> {ds.index[-1].date()}  "
-        f"{len(FEATURES)} features | balance S/H/B {bc}")
+        f"{len(ALL_FEATURES)} features"
+        + (f" (incl. {len(ALL_FEATURES) - len(FEATURES)} India-VIX)" if VIX_AVAILABLE else " [no VIX data]")
+        + f" | balance S/H/B {bc}")
 
     # ---------------- charts ----------------
     missing = [k for k in range(n) if not chart_path_for(ds.index[k]).exists()]
@@ -748,7 +751,12 @@ def main() -> None:
         "generated": time.strftime("%Y-%m-%d %H:%M"),
         "meta": {
             "data_from": str(ds.index[0].date()), "data_to": str(ds.index[-1].date()),
-            "n_samples": int(n), "n_features": len(FEATURES),
+            "n_samples": int(n), "n_features": len(ALL_FEATURES),
+            "vix": ({"available": True,
+                     "note": "India VIX (NSE, computed from the NIFTY 50 option chain) "
+                             "features on supervised models; neutral-filled pre-2020-08"}
+                    if VIX_AVAILABLE else
+                    {"available": False, "note": "INDIAVIX.csv missing - price features only"}),
             "label_rule": f"next-day return > +{LABEL_THR:.1%} => BUY, < -{LABEL_THR:.1%} => SELL, else HOLD",
             "capital": INITIAL, "brokerage": 50, "slippage_pct": 0.25, "hold_days": 1,
             "wf_period": f"{str(oos_dates[0].date())} -> {str(oos_dates[-1].date())}",
@@ -766,8 +774,8 @@ def main() -> None:
         "backtests": bt,
         "monthly_pnl": monthly,
         "feature_importance": (
-            sorted(zip(FEATURES, [float(v) for v in
-                                  xg["insample"]["model"].feature_importances_]),
+            sorted(zip(ALL_FEATURES, [float(v) for v in
+                                      xg["insample"]["model"].feature_importances_]),
                    key=lambda t: -t[1])[:16]
             if hasattr(xg["insample"]["model"], "feature_importances_") else []),
         "attention": {"date": str(ds.index[hero_k].date()), "grid": attn[0].tolist(),

@@ -105,6 +105,43 @@ FEATURES = [
     "up_frac_20", "dow", "month",
 ]
 
+# --- India VIX: the option-chain-derived feature set (see vix_experiment.py) ---
+# India VIX is computed by NSE from the NIFTY 50 option chain itself. It is the
+# closest freely-available proxy for the "IV from the chain" data the reference
+# paper claims. Walk-forward test (2023->2026 OOS): +0.049 AUC on the
+# vol-expansion straddle label, positive every year; no rescuing effect on
+# daily direction.
+VIX_CSV = Path(__file__).parent / "data" / "chain" / "INDIAVIX.csv"
+VIX_AVAILABLE = VIX_CSV.exists()
+VIX_FEATURES = [
+    "vix_close", "vix_chg_1d", "vix_ret_5d",
+    "vix_z_60d", "vix_pctile_252", "vix_vs_realized", "vix_avail",
+]
+# Pre-VIX-era neutral fills (sentinel values trees can branch on; vix_avail=0
+# marks them). India VIX long-run average ~15.
+VIX_FILL = {"vix_close": 15.0, "vix_chg_1d": 0.0, "vix_ret_5d": 0.0,
+            "vix_z_60d": 0.0, "vix_pctile_252": 0.5, "vix_vs_realized": 0.0,
+            "vix_avail": 0.0}
+ALL_FEATURES = FEATURES + (VIX_FEATURES if VIX_AVAILABLE else [])
+
+
+def add_vix_features(df: pd.DataFrame) -> pd.DataFrame | None:
+    """Daily India VIX features aligned to df's index (None if no VIX file)."""
+    if not VIX_AVAILABLE:
+        return None
+    v = pd.read_csv(VIX_CSV, parse_dates=["date"]).set_index("date").sort_index()["close"]
+    v = v.reindex(df.index)
+    out = pd.DataFrame(index=df.index)
+    out["vix_close"] = v
+    out["vix_chg_1d"] = v.diff()
+    out["vix_ret_5d"] = v / v.shift(5) - 1.0
+    m60, s60 = v.rolling(60).mean(), v.rolling(60).std()
+    out["vix_z_60d"] = (v - m60) / s60
+    out["vix_pctile_252"] = v.rolling(252, min_periods=60).rank(pct=True)
+    out["vix_vs_realized"] = v / (df["iv_proxy"] * 100.0) - 1.0
+    out["vix_avail"] = v.notna().astype(float)
+    return out.fillna(VIX_FILL)
+
 
 def make_dataset() -> pd.DataFrame:
     """Full feature matrix + labels.  Rows with undefined features are dropped."""
@@ -124,7 +161,11 @@ def make_dataset() -> pd.DataFrame:
     out["low"] = df["Low"].values
     out["volume"] = df["Volume"].values
 
-    out = out.dropna(subset=FEATURES)
+    vf = add_vix_features(out)
+    if vf is not None:
+        out = pd.concat([out, vf], axis=1)
+
+    out = out.dropna(subset=ALL_FEATURES)
     out = out.iloc[:-1]                  # last row has no next day
     return out
 
