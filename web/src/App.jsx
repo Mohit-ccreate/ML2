@@ -23,6 +23,7 @@ import {
   pseudoPredict, batchDays, batchDay, equitySeries, BT_STATS, MONTHLY_PNL, TRADES,
   BENCH, SENTIMENT, GREEKS, FINDINGS, REPORT_FILES, METHOD,
 } from "./mock";
+import { useLive, apiLatest, apiPredictCsv, apiPredictRange } from "./live";
 
 /* ============================== helpers ============================== */
 const cls = (...a) => a.filter(Boolean).join(" ");
@@ -412,7 +413,9 @@ const TABS = [
   { id: "benchmarks", label: "Benchmarks", icon: Scale },
   { id: "reports", label: "Reports", icon: FileText },
 ];
-function Header({ tab, setTab, theme, setTheme, refreshing, onRefresh }) {
+function Header({ tab, setTab, theme, setTheme, refreshing, onRefresh, src = "mock", built = null, tick = null }) {
+  const last = tick?.[tick.length - 1] || null;
+  const prev = tick?.[tick.length - 2] || null;
   return (
     <header className="sticky top-0 z-40 border-b border-edge/80 bg-base/85 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
@@ -455,7 +458,11 @@ function Header({ tab, setTab, theme, setTheme, refreshing, onRefresh }) {
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
           <span className="hidden items-center gap-1.5 rounded-lg border border-edge bg-panel/50 px-2.5 py-1.5 font-mono text-[9.5px] tracking-wider text-mid md:flex">
-            <Timer size={11} className="text-cyan" /> BUILT {TELEM.built}
+            <Timer size={11} className="text-cyan" /> BUILT {built || TELEM.built}
+          </span>
+          <span className={cls("hidden items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[9px] font-bold tracking-[0.14em] md:flex",
+            src === "api" ? "border-green/40 bg-green/10 text-green" : "border-amber/40 bg-amber/10 text-amber")}>
+            {src === "api" ? "DATA · LIVE API" : "DATA · MOCK"}
           </span>
           <Btn variant="cyan" icon={RefreshCw} onClick={onRefresh} disabled={refreshing} className="!px-3 !py-1.5">
             {refreshing ? "SYNCING" : "REFRESH"}
@@ -473,21 +480,22 @@ function Header({ tab, setTab, theme, setTheme, refreshing, onRefresh }) {
         <div className="mx-auto flex max-w-[1440px] items-center gap-x-5 overflow-x-auto px-5 py-1.5 font-mono text-[10.5px]">
           <span className="flex items-center gap-2 whitespace-nowrap">
             <span className="font-bold tracking-wider text-mid">NIFTY 50</span>
-            <span className="font-bold tabular-nums text-hi">{TELEM.nifty.close.toLocaleString("en-IN")}</span>
-            <span className="flex items-center gap-0.5 font-bold tabular-nums text-green">
-              <ArrowUpRight size={11} />+{TELEM.nifty.ret}%
+            <span className="font-bold tabular-nums text-hi">{last ? last.close : TELEM.nifty.close.toLocaleString("en-IN")}</span>
+            <span className={cls("flex items-center gap-0.5 font-bold tabular-nums", (last ? last.ret : `+${TELEM.nifty.ret}%`).startsWith("-") ? "text-rose" : "text-green")}>
+              <ArrowUpRight size={11} className={(last ? last.ret : "").startsWith("-") ? "-scale-y-100" : ""} />
+              {last ? last.ret : `+${TELEM.nifty.ret}%`}
             </span>
           </span>
           <span className="text-edge">•</span>
-          <span className="whitespace-nowrap text-cyan">IV {TELEM.nifty.iv}%</span>
+          <span className="whitespace-nowrap text-cyan">IV {last ? last.iv : `${TELEM.nifty.iv}%`}</span>
           <span className="text-edge">•</span>
-          <span className="whitespace-nowrap text-mid">RSI {TELEM.nifty.rsi}</span>
+          <span className="whitespace-nowrap text-mid">RSI {last ? last.rsi : TELEM.nifty.rsi}</span>
           <span className="text-edge">•</span>
-          <span className="whitespace-nowrap text-green">OI {TELEM.nifty.oi}%</span>
+          <span className="whitespace-nowrap text-green">VOL21 {last ? last.vol21 : `${TELEM.nifty.oi}%`}</span>
           <span className="text-edge">•</span>
           <span className="whitespace-nowrap text-lo">
-            PREV {TELEM.prev.d} · {TELEM.prev.close.toLocaleString("en-IN")}{" "}
-            <span className="text-mid">({pctS(TELEM.prev.ret)})</span>
+            PREV {prev ? prev.d : TELEM.prev.d} · {prev ? prev.close : TELEM.prev.close.toLocaleString("en-IN")}{" "}
+            <span className="text-mid">({prev ? prev.ret : pctS(TELEM.prev.ret)})</span>
           </span>
           <span className="ml-auto flex items-center gap-1.5 whitespace-nowrap text-lo">
             <Wifi size={11} className="text-green" /> {TELEM.sessions.toLocaleString("en-IN")} SESSIONS · {TELEM.range}
@@ -499,12 +507,12 @@ function Header({ tab, setTab, theme, setTheme, refreshing, onRefresh }) {
 }
 
 /* ============================== 1 · OVERVIEW ============================== */
-function ModelRoster({ loading }) {
+function ModelRoster({ loading, rows0 }) {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("name");
   const [fam, setFam] = useState("all");
   const rows = useMemo(() => {
-    let r = MODELS.filter((m) => (fam === "all" || m.fam === fam) && m.name.toLowerCase().includes(q.trim().toLowerCase()));
+    let r = (rows0 || MODELS).filter((m) => (fam === "all" || m.fam === fam) && m.name.toLowerCase().includes(q.trim().toLowerCase()));
     const key = {
       name: (m) => m.name, insample: (m) => m.ins.a, paper: (m) => m.paper.a,
       wf: (m) => m.wf.a, auc: (m) => m.auc, ret: (m) => m.ret, sharpe: (m) => m.sharpe,
@@ -582,8 +590,11 @@ function ModelRoster({ loading }) {
     </Card>
   );
 }
-function OverviewTab({ loading, go }) {
-  const eq = useMemo(() => equitySeries(), []);
+function OverviewTab({ loading, go, L }) {
+  const eq = useMemo(() => (L && L.equity ? L.equity : equitySeries()), [L]);
+  const H = L?.hero || {};
+  const al = L?.alpha || {};
+  const ensAcc = L ? (L.models.find((m) => m.kind === "ens")?.wf.a ?? 0) : null;
   return (
     <>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
@@ -591,23 +602,26 @@ function OverviewTab({ loading, go }) {
           Array.from({ length: 7 }).map((_, i) => <Sk key={i} className="h-[86px]" />)
         ) : (
           <>
-            <Stat icon={ArrowUpRight} label="Last Close" value={TELEM.nifty.close.toLocaleString("en-IN")} sub="NIFTY 50 · 2026-04-10" tone="green" />
-            <Stat icon={Waves} label="ATM IV" value={`${TELEM.nifty.iv}%`} sub="parkinson 21d · +0.4pp" tone="cyan" />
-            <Stat icon={GaugeIcon} label="RSI (14)" value={TELEM.nifty.rsi} sub="neutral zone 40–60" tone={TELEM.nifty.rsi > 70 || TELEM.nifty.rsi < 30 ? "amber" : "cyan"} />
-            <Stat icon={TrendingUp} label="OI Δ 21D" value={`+${TELEM.nifty.oi}%`} sub="open interest build-up" tone="green" />
-            <Stat icon={Target} label="Honest OOS Acc" value="47.8%" sub="walk-fwd 3-class · base 44.1%" tone="violet" />
-            <Stat icon={Zap} label="Alpha Straddle" value="+249.3%" sub="OOS 2020→26 · Sharpe 1.03" tone="green" />
+            <Stat icon={ArrowUpRight} label="Last Close" value={H.close != null ? Math.round(H.close).toLocaleString("en-IN") : TELEM.nifty.close.toLocaleString("en-IN")}
+              sub={`NIFTY 50 · ${H.date || "2026-04-10"} · ${L?.heroRet || pctS(TELEM.nifty.ret)}`} tone={L ? (H.close != null ? "green" : "green") : "green"} />
+            <Stat icon={Waves} label="ATM IV" value={L?.heroIv || `${TELEM.nifty.iv}%`} sub="parkinson 21d" tone="cyan" />
+            <Stat icon={GaugeIcon} label="RSI (14)" value={L?.heroRsi || TELEM.nifty.rsi} sub="neutral zone 40–60" tone="cyan" />
+            <Stat icon={TrendingUp} label="VOL 21D" value={L?.heroVol || `+${TELEM.nifty.oi}%`} sub="realized vol band" tone="green" />
+            <Stat icon={Target} label="Honest OOS Acc" value={L ? ensAcc.toFixed(2) + "%" : "47.8%"}
+              sub={L ? `3-class walk-fwd · ${L.meta?.n_samples ?? ""} rows` : "walk-fwd 3-class · base 44.1%"} tone="violet" />
+            <Stat icon={Zap} label="Alpha Straddle" value={L ? pctS(al.ret_pct) : "+249.3%"} sub={L ? `OOS ${al.period} · Sharpe ${al.sharpe}` : "OOS 2020→26 · Sharpe 1.03"} tone={L ? al.ret_pct >= 0 ? "green" : "rose" : "green"} />
             <Stat icon={BrainCircuit} label="Last Signal" value={LAST_SESSION.signal} sub={`ViT · ${LAST_SESSION.date}`} tone={LAST_SESSION.signal === "SELL" ? "rose" : LAST_SESSION.signal === "BUY" ? "green" : "amber"} />
           </>
         )}
       </div>
 
-      <ModelRoster loading={loading} />
+      <ModelRoster loading={loading} rows0={L?.models} />
 
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
         <Card>
           <CardHead
-            badge="EQUITY" tone="cyan" title="WALK-FORWARD OOS BACKTEST" sub="2020-01-02 → 2026-04-10 · ₹1,00,000 start"
+            badge="EQUITY" tone="cyan" title="WALK-FORWARD OOS BACKTEST"
+            sub={L ? `${L.oosPeriod} · 3-class ensemble · ₹1,00,000 start` : "2020-01-02 → 2026-04-10 · ₹1,00,000 start"}
             right={
               <button onClick={() => go("backtest")} className="focus-ring flex items-center gap-1 rounded-lg border border-edge bg-panel/60 px-2.5 py-1.5 font-mono text-[10px] font-semibold text-mid transition hover:border-cyan/40 hover:text-cyan">
                 VIEW FULL <ChevronDown size={11} className="-rotate-90" />
@@ -648,26 +662,33 @@ function OverviewTab({ loading, go }) {
 }
 
 /* ============================== 2 · VIT ATTENTION ============================== */
-function AttentionTab({ loading }) {
-  const [head, setHead] = useState(4);
+function AttentionTab({ loading, L }) {
+  const [head, setHead] = useState(1);
   const latest = useMemo(() => latest60(), []);
-  const grid = useMemo(() => attentionForHead(head, Math.round(TELEM.nifty.close)), [head]);
+  const att = L?.attention || null;
+  const grid = useMemo(() => {
+    if (L && att && head === 1) return [].concat(...att.grid);
+    return attentionForHead(head, Math.round(L?.hero.close ?? TELEM.nifty.close));
+  }, [head, L, att]);
   const spec = useMemo(() => Array.from({ length: 8 }, (_, h) => {
-    const g = attentionForHead(h + 1, Math.round(TELEM.nifty.close));
+    const g = (L && att && h === 0) ? [].concat(...att.grid) : attentionForHead(h + 1, Math.round(L?.hero.close ?? TELEM.nifty.close));
     const cols = new Array(8).fill(0);
     g.forEach((v, i) => { cols[i % 8] += v / 8; });
     return cols;
-  }), []);
+  }), [L, att]);
   const top = grid.map((w, i) => [w, i]).sort((a, b) => b[0] - a[0]).slice(0, 4);
   const peak = Math.max(...grid);
+  const sess = att || LAST_SESSION;
+  const ensAcc = L ? (L.models.find((m) => m.kind === "ens")?.wf.a ?? 0) : 47.8;
+  const alRet = L ? L.alpha.ret_pct : 249.3;
   return (
     <Card>
       <CardHead
         badge="VISION TRANSFORMER" tone="violet" title="LIVE ATTENTION FEED"
-        sub={`${LAST_SESSION.date} · close ${inr(TELEM.nifty.close)} · D192 × 4 blocks · 6 heads`}
+        sub={`${sess.date} · close ${inr(L?.hero.close ?? TELEM.nifty.close)} · D192 × 4 blocks · 6 heads ${L && head === 1 ? "· GRID = LIVE SAVED" : ""}`}
         right={
           <Seg value={`h${head}`} onChange={(v) => setHead(+v.slice(1))}
-            options={Array.from({ length: 8 }, (_, i) => ({ v: `h${i + 1}`, l: `H${i + 1}` }))} />
+            options={Array.from({ length: 8 }, (_, i) => ({ v: `h${i + 1}`, l: `H${i + 1}${L && i === 0 ? " ·" : ""}` }))} />
         }
       />
       <div className="grid gap-5 p-5 lg:grid-cols-[1.15fr_1fr]">
@@ -678,8 +699,8 @@ function AttentionTab({ loading }) {
             <div>
               <CandleViz rows={latest} grid={grid} />
               <div className="mt-3 flex flex-wrap items-center gap-4">
-                <SignalBadge signal={LAST_SESSION.signal} />
-                <div className="min-w-[220px] flex-1"><ProbBars probs={LAST_SESSION.probs} /></div>
+                <SignalBadge signal={sess.signal} />
+                <div className="min-w-[220px] flex-1"><ProbBars probs={sess.probs} /></div>
               </div>
               <p className="mt-3 font-mono text-[10px] leading-relaxed text-lo">
                 The pulsing grid is the [CLS] token's attention over the 8×8 patch grid of the exact 64×64 candlestick
@@ -689,9 +710,15 @@ function AttentionTab({ loading }) {
             <div className="space-y-4">
               <Callout tone="violet" icon={Info}>
                 <b className="text-hi">Methodology:</b> this runs the in-sample fit — recent dates look confident by
-                construction. Walk-forward OOS keeps daily direction at chance (47.8% 3-class vs 44.1% base); the
-                deployable signal is the <b className="text-hi">vol-expansion straddle</b> (Backtest tab).
+                construction. Walk-forward OOS keeps daily direction at chance ({ensAcc.toFixed(1)}% 3-class); the
+                deployable signal is the <b className="text-hi">vol-expansion straddle</b> ({pctS(alRet)} OOS, Backtest tab).
               </Callout>
+              {L && head !== 1 && (
+                <Callout tone="amber" icon={Info}>
+                  H2–H8 shown here are mock previews (only head 1's grid is stored with the model). Switch to
+                  <b className="text-hi"> H1</b> for the live saved attention grid from the trained ViT.
+                </Callout>
+              )}
               <div>
                 <div className="mb-2 font-mono text-[9.5px] font-bold tracking-[0.18em] text-lo">HEAD × PATCH ENERGY (SPECTROGRAM)</div>
                 <div className="overflow-hidden rounded-xl border border-edge/80">
@@ -741,7 +768,7 @@ const SCEN = {
   chop: { label: "Sideways chop", sub: "alternating ±0.18%", icon: MoveHorizontal, tone: "amber", hover: "hover:border-amber/50" },
   random: { label: "Random walk", sub: "σ 0.8% / day", icon: Shuffle, tone: "cyan", hover: "hover:border-cyan/50" },
 };
-function PredictionsTab({ loading }) {
+function PredictionsTab({ loading, L }) {
   const [mode, setMode] = useState("custom");
   const [csv, setCsv] = useState("");
   const [csvErr, setCsvErr] = useState("");
@@ -763,12 +790,31 @@ function PredictionsTab({ loading }) {
 
   const finishPredict = (rows, title) => {
     const r = pseudoPredict(rows);
-    setResult({ rows, title, ...r, date: rows[rows.length - 1][0], close: rows[rows.length - 1][4], n: rows.length });
+    setResult({ rows, title, ...r, date: rows[rows.length - 1][0], close: rows[rows.length - 1][4], n: rows.length, src: "mock" });
     setPhase("done");
   };
   const runPredict = (rows, title, delay = 850) => {
     setPhase("run");
     setResult(null);
+    if (L) {
+      const text = rows.map((r) => r.join(",")).join("\n");
+      apiPredictCsv(text)
+        .then((r) => {
+          if (r.error) throw new Error(r.error);
+          setResult({
+            rows, title: `${title} · LIVE ViT`,
+            signal: r.signal, probs: r.probs, grid: [].concat(...(r.attention || [])),
+            date: r.date, close: r.close, n: rows.length,
+            chart_b64: r.chart_b64, actual: r.actual, next_ret_pct: r.next_ret_pct, src: "api",
+          });
+          setPhase("done");
+        })
+        .catch((e) => {
+          setCsvErr(`API: ${e.message} — showing deterministic mock instead`);
+          finishPredict(rows, title);
+        });
+      return;
+    }
     timerRef.current = setTimeout(() => finishPredict(rows, title), delay);
   };
   const applyTwist = (rows, dp) => {
@@ -783,7 +829,8 @@ function PredictionsTab({ loading }) {
   const predictCustom = () => {
     let rows;
     try { rows = parseCsv(csv); } catch (e) { setCsvErr(e.message); return; }
-    if (rows.length < 16) { setCsvErr(`need at least 16 daily rows (chart window + warm-up), got ${rows.length}`); return; }
+    const min = L ? 26 : 16;
+    if (rows.length < min) { setCsvErr(`need at least ${min} daily rows (chart window + warm-up), got ${rows.length}`); return; }
     setCsvErr("");
     origRef.current = rows;
     const eff = twist !== 0 ? applyTwist(rows, twist / 100) : rows;
@@ -813,6 +860,20 @@ function PredictionsTab({ loading }) {
     e.target.value = "";
   };
   const loadLatest = () => {
+    if (L) {
+      setPhase("run");
+      apiLatest(60)
+        .then((r) => {
+          if (r.error) throw new Error(r.error);
+          const rows = parseCsv(r.csv);
+          setCsv(r.csv);
+          origRef.current = rows;
+          setCsvErr(`loaded ${r.rows} live rows through ${r.date} — running ViT…`);
+          runPredict(rows, `latest ${r.rows}d from NIFTY`);
+        })
+        .catch((e) => setCsvErr(`latest fetch failed: ${e.message}`));
+      return;
+    }
     const rows = latest60();
     setCsv(rows.map((r) => r.join(",")).join("\n"));
     setCsvErr("");
@@ -833,6 +894,21 @@ function PredictionsTab({ loading }) {
     if (!from || !to || from > to) { setBatch({ phase: "error", prog: 0, out: [], msg: "invalid range — FROM must be on/before TO" }); return; }
     if (!days.length) { setBatch({ phase: "error", prog: 0, out: [], msg: "no trading days in range" }); return; }
     if (days.length > 60) { setBatch({ phase: "error", prog: 0, out: [], msg: `${days.length} days — max 60 sessions per batch` }); return; }
+    // live: hit the real Flask batch endpoint, which grades against actuals
+    if (L) {
+      setBatch({ phase: "run", prog: 50, out: [], msg: "live ViT running on the server…", days });
+      apiPredictRange(from, to)
+        .then((r) => {
+          if (r.error) throw new Error(r.error);
+          const out = (r.days || []).map((d) => ({
+            date: d.date, close: d.close, signal: d.signal, probs: d.probs,
+            next: d.next_ret_pct, actual: d.actual, hit: d.actual != null && d.signal === d.actual,
+          }));
+          setBatch({ phase: "done", prog: 100, out, days, live: true, summary: r.summary });
+        })
+        .catch((e) => setBatch({ phase: "error", prog: 0, out: [], msg: e.message }));
+      return;
+    }
     setBatch({ phase: "run", prog: 0, out: [], msg: "", days });
     let i = 0;
     const step = () => {
@@ -846,7 +922,9 @@ function PredictionsTab({ loading }) {
     };
     timerRef.current = setTimeout(step, 150);
   };
+  const graded = batch.out.filter((d) => d.actual != null);
   const hits = batch.out.filter((d) => d.hit).length;
+  const hitPct = batch.live && batch.summary ? batch.summary.exact_hit_pct : graded.length ? Math.round((100 * hits) / graded.length) : null;
 
   return (
     <>
@@ -887,7 +965,7 @@ function PredictionsTab({ loading }) {
                       <Btn icon={FolderUp} onClick={() => fileRef.current && fileRef.current.click()}>UPLOAD CSV</Btn>
                       <Btn icon={Download} onClick={loadLatest}>LOAD LATEST 60D</Btn>
                       <Btn variant="primary" icon={phase === "run" ? Loader2 : Play} onClick={predictCustom} disabled={phase === "run"}>
-                        {phase === "run" ? "RENDERING CHART…" : "PREDICT MY DATA"}
+                        {phase === "run" ? (L ? "RUNNING ON THE LIVE ViT…" : "RENDERING CHART…") : L ? "PREDICT MY DATA · LIVE" : "PREDICT MY DATA"}
                       </Btn>
                     </div>
                   </div>
@@ -990,8 +1068,8 @@ function PredictionsTab({ loading }) {
                       <div className="mb-3 flex flex-wrap gap-2.5">
                         {[
                           [String(batch.out.length), "SESSIONS RUN", "cyan"],
-                          [`${Math.round((100 * hits) / batch.out.length)}%`, "EXACT 3-CLASS HIT RATE", hits / batch.out.length >= 0.5 ? "green" : "amber"],
-                          [`${hits}/${batch.out.length}`, "CORRECT / GRADED", "violet"],
+                          [hitPct == null ? "—" : `${hitPct}%`, "EXACT 3-CLASS HIT RATE", hitPct >= 50 ? "green" : "amber"],
+                          [`${hits}/${graded.length}`, "CORRECT / GRADED", "violet"],
                         ].map(([v, l, t]) => (
                           <div key={l} className="rounded-xl border border-edge/80 bg-panel/60 px-4 py-2.5">
                             <div className={cls("font-mono text-xl font-bold tabular-nums", TONE[t])}>{v}</div>
@@ -1019,14 +1097,15 @@ function PredictionsTab({ loading }) {
                                   {d.hit && <CheckCircle2 size={11} className="ml-1.5 inline text-green" />}
                                 </Td>
                                 <Td className="text-mid">{d.probs.map((p) => (p * 100).toFixed(0)).join(" / ")}</Td>
-                                <Td className={d.next >= 0 ? "text-green" : "text-rose"}>{pctS(d.next, 2)}</Td>
-                                <Td className="text-mid">{d.actual}</Td>
+                                <Td className={d.next == null ? "text-lo" : d.next >= 0 ? "text-green" : "text-rose"}>{pctS(d.next, 2)}</Td>
+                                <Td className="text-mid">{d.actual || "—"}</Td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
                       </div>
                       <p className="mt-3 font-mono text-[10px] leading-relaxed text-lo">
+                        {batch.live ? "Live grading — every row is the real in-sample ViT served by the Flask API, checked against the actual next-day label. " : ""}
                         Green rows = the ViT's call matched the actual next-day label. The honest read: daily direction
                         hovers around chance — the vol-expansion straddle (Backtest) is where the edge is.
                       </p>
@@ -1068,15 +1147,28 @@ function PredictionsTab({ loading }) {
                     </label>
                     <span className="ml-auto flex items-center gap-1.5">low <i className="h-1 w-16 rounded bg-gradient-to-r from-transparent to-violet" /> high</span>
                   </div>
+                  {result.chart_b64 && (
+                    <div className="mt-3">
+                      <div className="mb-1.5 font-mono text-[9px] font-bold tracking-[0.18em] text-lo">EXACT 64×64 RENDER FED TO THE ViT</div>
+                      <img src={`data:image/png;base64,${result.chart_b64}`} alt="chart rendered for the ViT" className="w-full rounded-xl border border-edge/80 bg-[#0b0f1a]" />
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col justify-center gap-4">
                   <SignalBadge signal={result.signal} />
                   <ProbBars probs={result.probs} />
                   <div className="font-mono text-[10.5px] leading-relaxed text-mid">
-                    {result.date} · close {inr(result.close)} · {result.n} rows · in-sample ViT (mock inference)
+                    {result.date} · close {inr(result.close)} · {result.n} rows ·{" "}
+                    {result.src === "api" ? <b className="text-cyan">LIVE in-sample ViT · served by the Flask API</b> : "in-sample ViT (deterministic mock)"}
                   </div>
+                  {result.actual && (
+                    <div className={cls("rounded-lg border px-3 py-2 font-mono text-[10.5px]",
+                      result.signal === result.actual ? "border-green/40 bg-green/[0.07] text-green" : "border-rose/40 bg-rose/[0.07] text-rose")}>
+                      next-day actual: <b>{result.actual}</b> ({pctS(result.next_ret_pct, 2)}) — {result.signal === result.actual ? "the ViT got it right" : "the ViT was wrong"}
+                    </div>
+                  )}
                   <div className="font-mono text-[10.5px] text-lo">
-                    conviction {(Math.max(...result.probs) * 100).toFixed(1)}% on {result.signal} · your data has no ground truth — this is the open question.
+                    conviction {(Math.max(...result.probs) * 100).toFixed(1)}% on {result.signal} · {result.actual ? "in-sample fit — treat as a capacity demo, not foresight." : "your data has no ground truth — this is the open question."}
                   </div>
                 </div>
               </>
@@ -1216,16 +1308,29 @@ function GreeksTab({ loading }) {
 }
 
 /* ============================== 6 · BACKTEST ============================== */
-function BacktestTab({ loading }) {
-  const eq = useMemo(() => equitySeries(), []);
+function BacktestTab({ loading, L }) {
+  const eq = useMemo(() => (L && L.equity ? L.equity : equitySeries()), [L]);
+  const ensBt = L?.backtests?.Ensemble || null;
+  const stats = L && ensBt ? [
+    { l: "OOS Return", v: pctS(ensBt.total_return_pct, 1), tone: ensBt.total_return_pct >= 0 ? "green" : "rose" },
+    { l: "Sharpe", v: ensBt.sharpe, tone: "cyan" },
+    { l: "Max DD", v: `−${Math.abs(ensBt.max_drawdown_pct).toFixed(1)}%`, tone: "rose" },
+    { l: "Profit Factor", v: ensBt.profit_factor, tone: "cyan" },
+    { l: "Trades", v: ensBt.n_trades, tone: "mid" },
+    { l: "Win Rate", v: ensBt.win_rate_pct + "%", tone: "amber" },
+  ] : BT_STATS;
+  const trades = L ? (L.oos?.trades || []).slice(-10).map((t) => ({ d: t.d, close: t.close, sig: t.signal, opt: t.opt, entry: t.entry, exit: t.exit, ret: t.ret_pct })) : TRADES;
+  const monthly = L ? L.monthly.slice(-12) : MONTHLY_PNL.map((v) => [1, v]);
+  const monthLbl = (m) => ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"][m - 1];
   return (
     <>
       <Card>
         <CardHead
-          badge="WALK-FORWARD OOS" tone="cyan" title="DIRECTIONAL 1-DAY MODELS" sub="2020-01-02 → 2026-04-10 · ATM options · 25% stake"
+          badge="WALK-FORWARD OOS" tone="cyan" title="DIRECTIONAL 1-DAY MODELS"
+          sub={L ? `${L.oosPeriod} · ATM options · 25% stake · ensemble vs buy & hold` : "2020-01-02 → 2026-04-10 · ATM options · 25% stake"}
           right={
             <div className="flex flex-wrap gap-2">
-              {BT_STATS.map((s) => (
+              {stats.map((s) => (
                 <span key={s.l} className="rounded-lg border border-edge/80 bg-panel/60 px-2.5 py-1 font-mono text-[9.5px]">
                   <span className="tracking-wider text-lo">{s.l} </span>
                   <b className={TONE[s.tone]}>{s.v}</b>
@@ -1244,11 +1349,11 @@ function BacktestTab({ loading }) {
           <div className="p-4">{loading ? <Sk className="h-[150px]" /> : <DrawdownChart data={eq.series[0].data.map((p) => p[1])} />}</div>
         </Card>
         <Card>
-          <CardHead badge="P&L" tone="green" title="MONTHLY RETURNS" sub="ensemble · OOS · % per calendar month" />
+          <CardHead badge="P&L" tone="green" title="MONTHLY RETURNS" sub={L ? "ensemble · OOS · % per calendar month · last 12" : "ensemble · OOS · % per calendar month"} />
           <div className="p-4">
             {loading ? <Sk className="h-[150px]" /> : (
               <div className="grid grid-cols-6 gap-1.5">
-                {MONTHLY_PNL.map((v, i) => (
+                {monthly.map(([m, v], i) => (
                   <div
                     key={i}
                     className="flex h-14 flex-col items-center justify-center rounded-lg border font-mono"
@@ -1257,7 +1362,7 @@ function BacktestTab({ loading }) {
                       borderColor: `rgb(${v >= 0 ? "var(--c-green)" : "var(--c-rose)"} / 0.35)`,
                     }}
                   >
-                    <span className="text-[8px] text-lo">{["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"][i]}{i % 2 ? "25" : "24"}</span>
+                    <span className="text-[8px] text-lo">{monthLbl(m)}</span>
                     <span className={cls("text-[11px] font-bold tabular-nums", v >= 0 ? "text-green" : "text-rose")}>{v > 0 ? "+" : ""}{v.toFixed(1)}</span>
                   </div>
                 ))}
@@ -1276,10 +1381,10 @@ function BacktestTab({ loading }) {
                   <tr><Th>Date</Th><Th>NIFTY</Th><Th>Signal</Th><Th>Option</Th><Th>Entry</Th><Th>Exit</Th><Th>Ret</Th></tr>
                 </thead>
                 <tbody>
-                  {TRADES.map((t) => (
+                  {trades.map((t) => (
                     <tr key={t.d} className="border-b border-edge/40 last:border-0 hover:bg-cyan/[0.04]">
                       <Td className="text-mid">{t.d}</Td>
-                      <Td>22,545</Td>
+                      <Td>{t.close != null ? Math.round(t.close).toLocaleString("en-IN") : "—"}</Td>
                       <Td>
                         <span className={cls("rounded-md border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-wider",
                           t.sig === "BUY" ? "border-green/40 bg-green/10 text-green" : t.sig === "SELL" ? "border-rose/40 bg-rose/10 text-rose" : "border-amber/40 bg-amber/10 text-amber")}>
@@ -1305,103 +1410,261 @@ function BacktestTab({ loading }) {
 }
 
 /* ============================== 7 · BENCHMARKS ============================== */
-function BenchmarksTab({ loading }) {
+/* Paper-protocol replication numbers — from optionedge/results/paper_replication.json
+   (optionedge/paper_replication.py, same label/split/features/costs as the paper). */
+const PAPER_REPL = {
+  period: "NIFTY 50 · Jan 2020 → Dec 2024 · 1,237 sessions · BUY iff next-day return > +1%",
+  baselineChrono: 93.15,
+  baselineRandom: 83.47,
+  buyRate: 13.18,
+  rows: [
+    // [name, ours, paperAcc, chronoAcc, randomAcc, chronoRet, chronoSh, randomRet, randomSh, paperPnl, paperSh]
+    ["XGBoost", false, 89.2, 93.15, 83.87, -2.5, 0.26, 177.02, 1.6, 196450, 1.78],
+    ["RandomForest", false, 87.4, 93.15, 83.87, -5.88, 0.21, 166.23, 1.56, 182300, 1.53],
+    ["LSTM (5-day)", false, 90.1, 93.15, 85.89, 7.9, 0.43, 94.21, 1.18, 205720, 1.95],
+    ["LightGBM · ours", true, null, 93.15, 82.26, -2.5, 0.26, 102.34, 1.24, null, null],
+    ["XGBoost + class weights · ours", true, null, 91.13, 77.82, -9.95, 0.14, 102.32, 1.24, null, null],
+    ["Stacked meta-ensemble · ours", true, null, 93.15, 83.06, -2.5, 0.26, 156.85, 1.52, null, null],
+  ],
+};
+function BenchmarksTab({ loading, L }) {
+  const lcd = L?.lcd || null;
+  const models = L?.models || MODELS;
+  const al = L?.alpha || null;
   return (
     <>
-      <Card>
-        <CardHead
-          badge="BENCHMARK" tone="amber" title="OPTIONEDGE VS THE REFERENCE PAPER" sub={BENCH.paper}
-        />
-        <div className="grid gap-5 p-5 lg:grid-cols-[1.4fr_1fr]">
-          {loading ? <div className="space-y-3"><Sk className="h-[280px]" /><Sk className="h-[280px]" /></div> : (
-            <>
-              <div className="space-y-5">
-                {BENCH.rows.map((r) => (
-                  <div key={r.m}>
-                    <div className="mb-1.5 flex items-baseline justify-between">
-                      <span className="font-mono text-[10.5px] font-bold tracking-[0.14em] text-mid">{r.m.toUpperCase()}</span>
-                      <span className="font-mono text-[10px] tabular-nums text-lo">
-                        paper <b className="text-mid">{r.paper}{r.unit}</b> · optionedge <b className="text-cyan">{r.ours}{r.unit}</b>
-                      </span>
-                    </div>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-16 shrink-0 text-right font-mono text-[8.5px] tracking-wider text-lo">PAPER</span>
-                        <div className="h-3 flex-1 overflow-hidden rounded-md bg-edge/50">
-                          <div className="h-full rounded-md bg-mid/40" style={{ width: `${(r.paper / r.max) * 100}%` }} />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-16 shrink-0 text-right font-mono text-[8.5px] font-bold tracking-wider text-cyan">OUR</span>
-                        <div className="h-3 flex-1 overflow-hidden rounded-md bg-edge/50">
-                          <div className="h-full rounded-md bg-gradient-to-r from-cyan to-violet" style={{ width: `${(r.ours / r.max) * 100}%` }} />
-                        </div>
-                      </div>
-                    </div>
+      {loading ? (
+        <div className="space-y-3"><Sk className="h-[220px]" /><Sk className="h-[300px]" /><Sk className="h-[200px]" /></div>
+      ) : (
+        <div className="space-y-4">
+          {/* ============ 1 · THE HEAD-TO-HEAD ============ */}
+          <Card className="border-amber/25">
+            <CardHead
+              badge="PAPER PROTOCOL" tone="amber" title="THE PAPER, RUN THE PAPER'S WAY"
+              sub={`${PAPER_REPL.period} · 80:20 split · ₹1L · BUY→ATM call / SELL→ATM put · 1-day hold · ₹50 + 0.25% slip`}
+            />
+            <div className="p-5">
+              <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-xl border border-rose/30 bg-rose/[0.06] p-4">
+                  <div className="font-mono text-[9px] font-bold tracking-[0.16em] text-rose">DOING NOTHING (ALWAYS SELL)</div>
+                  <div className="mt-1.5 font-mono text-3xl font-bold tabular-nums text-hi">93.15%</div>
+                  <div className="mt-1 text-[11px] leading-snug text-mid">
+                    only <b className="text-hi">{PAPER_REPL.buyRate}%</b> of days ever rise more than +1% next day —
+                    so "always SELL" is correct <b className="text-hi">93.15%</b> of the 2024 test year.
                   </div>
-                ))}
-                <p className="font-mono text-[10px] leading-relaxed text-lo">
-                  In-sample style, like the paper's table — capacity demonstration, not forecasting skill.
-                  Apples-to-apples on XGBoost-class models.
+                </div>
+                <div className="rounded-xl border border-edge/80 bg-panel/60 p-4">
+                  <div className="font-mono text-[9px] font-bold tracking-[0.16em] text-mid">PAPER'S TABLE 1 (REPORTED)</div>
+                  <div className="mt-1.5 font-mono text-3xl font-bold tabular-nums text-hi">89.2–90.1%</div>
+                  <div className="mt-1 text-[11px] leading-snug text-mid">
+                    XGB 89.2 · RF 87.4 · LSTM 90.1 — <b className="text-hi">all below the no-model baseline</b> on an
+                    honest split, and their ₹1.8–2.1L profits (below).
+                  </div>
+                </div>
+                <div className="rounded-xl border border-cyan/30 bg-cyan/[0.05] p-4">
+                  <div className="font-mono text-[9px] font-bold tracking-[0.16em] text-cyan">EVERY MODEL WE RE-RAN</div>
+                  <div className="mt-1.5 font-mono text-3xl font-bold tabular-nums text-hi">≤ 93.15%</div>
+                  <div className="mt-1 text-[11px] leading-snug text-mid">
+                    chronological 80:20: trees + LSTM + stacked all land exactly at the baseline.
+                    <b className="text-hi"> The label, not the model, sets the score.</b>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-2 font-mono text-[9.5px] font-bold tracking-[0.18em] text-lo">ACCURACY · PAPER'S LABEL, PAPER'S SPLIT</div>
+              <Adense>
+                <thead className="border-b border-edge/60">
+                  <tr><Th>Model</Th><Th>Paper Table 1</Th><Th>Ours · chronological</Th><Th>Ours · random (leaky)</Th><Th>Majority baseline</Th></tr>
+                </thead>
+                <tbody>
+                  {PAPER_REPL.rows.map((r) => (
+                    <tr key={r[0]} className="border-b border-edge/40 last:border-0">
+                      <Td className={cls("font-bold", r[1] ? "text-amber" : "text-hi")}>{r[0]}</Td>
+                      <Td className={r[2] == null ? "text-lo" : "text-mid"}>{r[2] == null ? "—" : r[2].toFixed(1) + "%"}</Td>
+                      <Td className={cls(r[3] >= PAPER_REPL.baselineChrono ? "text-rose" : "text-cyan")}>{r[3].toFixed(2)}%</Td>
+                      <Td className={r[4] > PAPER_REPL.baselineRandom ? "text-amber" : "text-mid"}>{r[4].toFixed(2)}%</Td>
+                      <Td className="text-lo">chr {PAPER_REPL.baselineChrono}% · rnd {PAPER_REPL.baselineRandom}%</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Adense>
+
+              <div className="mb-2 mt-5 font-mono text-[9.5px] font-bold tracking-[0.18em] text-lo">BACKTEST · ₹1,00,000 · PAPER'S EXACT TRADING RULES</div>
+              <Adense>
+                <thead className="border-b border-edge/60">
+                  <tr><Th>Model</Th><Th>Paper P&L (reported)</Th><Th>Paper Sharpe</Th><Th>Ours · chronological</Th><Th>Ours · random (leaky)</Th></tr>
+                </thead>
+                <tbody>
+                  {PAPER_REPL.rows.map((r) => (
+                    <tr key={r[0]} className="border-b border-edge/40 last:border-0">
+                      <Td className={cls("font-bold", r[1] ? "text-amber" : "text-hi")}>{r[0]}</Td>
+                      <Td className={r[9] == null ? "text-lo" : "text-mid"}>{r[9] == null ? "—" : "+" + inr(r[9])}</Td>
+                      <Td className={r[10] == null ? "text-lo" : "text-mid"}>{r[10] == null ? "—" : r[10].toFixed(2)}</Td>
+                      <Td className={r[5] >= 0 ? "text-green" : "text-rose"}>{pctS(r[5])} · Sh {r[6].toFixed(2)}</Td>
+                      <Td className="text-green">{pctS(r[7])} · Sh {r[8].toFixed(2)}</Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Adense>
+              <p className="mt-3 font-mono text-[10px] leading-relaxed text-lo">
+                Same data, same +1% label, same option mapping, same costs. Chronological 80:20 = honest
+                (2020–23 train → 2024 test); random 80:20 = the leaky variant the paper's split type never specifies.
+                Reproduction: optionedge/paper_replication.py → results/paper_replication.json.
+              </p>
+            </div>
+          </Card>
+
+          {/* ============ 2 · WHY THE PAPER LOOKS GOOD ============ */}
+          <Card>
+            <CardHead badge="VERDICT" tone="rose" title="WHY THE PAPER'S TABLE LOOKS SO GOOD" sub="Three compounding effects — none of them forecasting skill" />
+            <div className="grid gap-4 p-5 lg:grid-cols-3">
+              <div className="rounded-xl border border-rose/25 bg-rose/[0.04] p-4">
+                <div className="mb-2 flex items-center gap-2"><Scale size={13} className="text-rose" />
+                  <span className="font-mono text-[10px] font-bold tracking-[0.16em] text-rose">1 · MAJORITY CLASS</span></div>
+                <p className="text-[11.5px] leading-relaxed text-mid">
+                  "Next day up more than +1%" is true on only <b className="text-hi">13.2%</b> of sessions. A
+                  no-model "always SELL" scores <b className="text-hi">93.15%</b> on the 2024 test year — the
+                  paper's best model (90.1%) doesn't beat it. {lcd ? <>{lcd.note}</> : ""}
                 </p>
               </div>
-              <div className="space-y-4">
-                <div className="rounded-xl border border-amber/30 bg-amber/[0.05] p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <AlertTriangle size={14} className="text-amber" />
-                    <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-amber">LABEL-DESIGN CHECK</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-lg border border-edge/80 bg-panel/60 p-3 text-center">
-                      <div className="font-mono text-2xl font-bold tabular-nums text-hi">{BENCH.labelCheck.model}%</div>
-                      <div className="mt-1 font-mono text-[8.5px] tracking-wider text-lo">MODEL · PAPER LABEL</div>
-                    </div>
-                    <div className="rounded-lg border border-edge/80 bg-panel/60 p-3 text-center">
-                      <div className="font-mono text-2xl font-bold tabular-nums text-amber">{BENCH.labelCheck.majority}%</div>
-                      <div className="mt-1 font-mono text-[8.5px] tracking-wider text-lo">MAJORITY · NO MODEL</div>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-[11.5px] leading-relaxed text-mid">{BENCH.labelCheck.note}</p>
-                </div>
-                <div>
-                  <div className="mb-2 font-mono text-[9.5px] font-bold tracking-[0.18em] text-lo">THREE PROTOCOLS · 3-CLASS / UP-DOWN</div>
-                  <Adense>
-                    <thead className="border-b border-edge/60">
-                      <tr><Th>Model</Th><Th>In-Sample</Th><Th>Paper 80/20</Th><Th>Walk-Fwd</Th></tr>
-                    </thead>
-                    <tbody>
-                      {MODELS.map((m) => (
-                        <tr key={m.name} className="border-b border-edge/40 last:border-0">
-                          <Td className="text-mid">{m.name.split(" ")[0]}</Td>
-                          <Td>{m.ins.a.toFixed(1)} / {m.ins.d.toFixed(1)}</Td>
-                          <Td>{m.paper.a.toFixed(1)} / {m.paper.d.toFixed(1)}</Td>
-                          <Td className="font-bold text-cyan">{m.wf.a.toFixed(1)} / {m.wf.d.toFixed(1)}</Td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Adense>
-                </div>
+              <div className="rounded-xl border border-amber/25 bg-amber/[0.04] p-4">
+                <div className="mb-2 flex items-center gap-2"><Shuffle size={13} className="text-amber" />
+                  <span className="font-mono text-[10px] font-bold tracking-[0.16em] text-amber">2 · SPLIT LEAKAGE</span></div>
+                <p className="text-[11.5px] leading-relaxed text-mid">
+                  A random 80:20 scatters adjacent days across train/test — fatal for a 5-day window LSTM. Under it,
+                  our LSTM hits <b className="text-hi">85.89%</b> (baseline there is 83.47%) vs 93.15% no-skill on
+                  the honest split. That's the only way the paper's 90.1% becomes reachable.
+                </p>
               </div>
-            </>
-          )}
+              <div className="rounded-xl border border-green/25 bg-green/[0.04] p-4">
+                <div className="mb-2 flex items-center gap-2"><TrendingUp size={13} className="text-green" />
+                  <span className="font-mono text-[10px] font-bold tracking-[0.16em] text-green">3 · BULL ATM OPTIONS</span></div>
+                <p className="text-[11.5px] leading-relaxed text-mid">
+                  NIFTY 50 tripled over 2020–24. In the leaky split, even a barely-above-baseline signal prints
+                  <b className="text-hi"> +94–177%</b> (Sharpe 1.18–1.60) from daily ATM option P&L — the same order
+                  as the paper's ₹1.8–2.1L. The profits measure the market, not the model.
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* ============ 3 · OUR PROTOCOL ============ */}
+          <Card>
+            <CardHead
+              badge="OUR PROTOCOL" tone="cyan" title="HONEST WALK-FORWARD (3-CLASS, ±0.5% DEADBAND)"
+              sub="Not directly comparable to the paper's 2-class +1% label — shown for the record"
+            />
+            <div className="grid gap-5 p-5 lg:grid-cols-[1.5fr_1fr]">
+              <div>
+                <Adense>
+                  <thead className="border-b border-edge/60">
+                    <tr><Th>Model</Th><Th>In-Sample</Th><Th>Paper-style 80:20</Th><Th>Walk-Fwd OOS</Th><Th>OOS Return</Th><Th>Sharpe</Th></tr>
+                  </thead>
+                  <tbody>
+                    {models.map((m) => (
+                      <tr key={m.name} className="border-b border-edge/40 last:border-0">
+                        <Td className="font-bold">{m.name.split(" ")[0]}</Td>
+                        <Td className="text-mid">{(m.ins?.a ?? 0).toFixed(1)} / {(m.ins?.d ?? 0).toFixed(1)}</Td>
+                        <Td className="text-mid">{m.paper ? `${m.paper.a.toFixed(1)} / ${m.paper.d.toFixed(1)}` : "—"}</Td>
+                        <Td className="font-bold text-cyan">{(m.wf?.a ?? 0).toFixed(1)} / {(m.wf?.d ?? 0).toFixed(1)}</Td>
+                        <Td className={m.ret >= 0 ? "text-green" : "text-rose"}>{pctS(m.ret, 0)}</Td>
+                        <Td className={m.sharpe >= 1 ? "text-green" : "text-cyan"}>{(m.sharpe ?? 0).toFixed(2)}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Adense>
+                <p className="mt-2 font-mono text-[9.5px] leading-relaxed text-lo">
+                  3-class BUY/HOLD/SELL with ±0.5% deadband · strict yearly walk-forward 2020 → 2026 ·
+                  daily direction stays at chance — that's the honest answer for 1-day signals.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <Callout tone="green" icon={Zap}>
+                  <b className="text-hi">The signal that survives:</b> the vol-expansion straddle. Walk-fwd OOS
+                  {al ? <> AUC <b className="text-hi">{(al["walk-forward OOS"]?.auc ?? 0).toFixed(3)}</b> · {pctS(al.ret_pct)} (Sh {al.sharpe})</> : " AUC 0.570 · +249.3% (Sh 1.03)"}
+                  {" "} vs straddle-every-5d {pctS(al?.baselines?.["Straddle every 5d"]?.total_return_pct ?? 216.7)}
+                  {" "}(Sh {al?.baselines?.["Straddle every 5d"]?.sharpe ?? 0.74}) and B&H {pctS(al?.baselines?.["Buy&Hold (same period)"]?.total_return_pct ?? 86.4)}.
+                </Callout>
+                <Callout tone="cyan" icon={Waves}>
+                  <b className="text-hi">VIX upgrade:</b> adding 7 India-VIX features to the straddle model lifted
+                  walk-fwd AUC from 0.539 to <b className="text-hi">0.585</b> (2022→26 OOS) — chain-implied
+                  vol is a real timing edge for 5-day range events.
+                </Callout>
+                <Callout tone="amber" icon={AlertTriangle}>
+                  <b className="text-hi">Bottom line:</b> the paper's table is baseline + leakage + bull-market
+                  option P&L. Our walk-forward direction models are at chance; the straddle alpha is the only
+                  out-of-sample edge that survives every protocol we tried.
+                </Callout>
+              </div>
+            </div>
+          </Card>
         </div>
-      </Card>
+      )}
     </>
   );
 }
 
 /* ============================== 8 · REPORTS ============================== */
-function ReportsTab({ loading }) {
+function ReportsTab({ loading, L }) {
   const [exports, setExports] = useState({});
   const doExport = (i) => {
     if (exports[i] !== "idle") return;
     setExports((e) => ({ ...e, [i]: "prep" }));
     setTimeout(() => setExports((e) => ({ ...e, [i]: "ready" })), 900);
   };
+  const al = L?.alpha || null;
+  const ensAcc = L ? (L.models.find((m) => m.kind === "ens")?.wf.a ?? 0) : null;
+  const findings = FINDINGS.map((f) => {
+    if (!L) return f;
+    if (f.n === 3) return {
+      ...f,
+      b: `Every directional model sits at ${Math.min(...L.models.map((m) => m.wf?.a ?? 0)).toFixed(0)}–${Math.max(...L.models.map((m) => m.wf?.a ?? 0)).toFixed(0)}% 3-class on strictly OOS yearly blocks (ensemble ${ensAcc.toFixed(1)}%), AUC ≈ 0.50. Big OOS P&L is market beta, not alpha.`,
+    };
+    if (f.n === 4) return {
+      ...f,
+      b: `Walk-forward XGBoost on 'next 5d move > IV-implied range': ${(al["walk-forward OOS"]?.auc ?? 0).toFixed(3)} AUC OOS (now with 7 India-VIX features). Fixed-stake straddles: ${pctS(al.ret_pct)} OOS, Sharpe ${al.sharpe}, PF ${al.pf} — beats every baseline on risk metrics.`,
+    };
+    return f;
+  });
+  findings.push({
+    n: 5,
+    t: "India VIX is the chain-IV edge we were missing",
+    b: `Pre-VIX era (2010–20) the straddle model had no vol-regime input. 7 India-VIX features (level, 252d percentile, vs realized, term spread…) lift walk-fwd AUC 0.539 → 0.585 (2022→26 OOS) with positive lift every single year. Now wired into the training pipeline — ${L?.meta?.n_features ?? 36}-feature dataset.`,
+    tone: "amber",
+  });
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2">
-        {FINDINGS.map((f) => (
+      <Card className="border-rose/30 bg-gradient-to-br from-rose/[0.07] via-panel/60 to-amber/[0.05]">
+        <div className="p-5">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Badge tone="rose">HEADLINE VERDICT</Badge>
+            <span className="font-mono text-[10px] tracking-wider text-lo">PAPER PROTOCOL REPLICATION · {PAPER_REPL.period}</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-xl border border-edge/70 bg-base/40 p-4">
+              <div className="font-mono text-[9px] font-bold tracking-[0.16em] text-lo">NO-MODEL BASELINE</div>
+              <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-hi">93.15%</div>
+              <div className="mt-1 text-[11px] text-mid">always-SELL on the paper's +1% label, honest 2024 test year</div>
+            </div>
+            <div className="rounded-xl border border-edge/70 bg-base/40 p-4">
+              <div className="font-mono text-[9px] font-bold tracking-[0.16em] text-lo">PAPER TABLE 1</div>
+              <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-hi">89.2–90.1%</div>
+              <div className="mt-1 text-[11px] text-mid">below the baseline on an honest split; reachable only with a leaky random 80:20</div>
+            </div>
+            <div className="rounded-xl border border-cyan/40 bg-cyan/[0.06] p-4">
+              <div className="font-mono text-[9px] font-bold tracking-[0.16em] text-cyan">OUR RE-RUN (6 MODELS)</div>
+              <div className="mt-1 font-mono text-2xl font-bold tabular-nums text-hi">≤ 93.15%</div>
+              <div className="mt-1 text-[11px] text-mid">every model at baseline on the honest split — the label design, not the model, sets the score</div>
+            </div>
+          </div>
+          <p className="mt-3 font-mono text-[10px] leading-relaxed text-lo">
+            Full head-to-head (accuracy + ₹1L backtest, paper's exact costs) → BENCHMARKS tab. Reproduction:
+            optionedge/paper_replication.py → results/paper_replication.json (n=1,237, 13.2% BUY rate).
+          </p>
+        </div>
+      </Card>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        {findings.map((f) => (
           <Card key={f.n} className={cls("p-5", f.tone === "green" && "border-green/30", f.tone === "rose" && "border-rose/30", f.tone === "violet" && "border-violet/30")}>
             <div className="flex items-start gap-3">
               <span className={cls("grid h-8 w-8 shrink-0 place-items-center rounded-lg border font-display text-[13px] font-black",
@@ -1469,6 +1732,7 @@ function ReportsTab({ loading }) {
 /* ============================== APP SHELL ============================== */
 export default function App({ initialTab = "overview", instantData = false }) {
   const [tab, setTab] = useState(initialTab);
+  const { live, src, reload } = useLive();
   const [theme, setTheme] = useState(() => {
     try { return (typeof localStorage !== "undefined" && localStorage.getItem("oe2-theme")) || "dark"; } catch { return "dark"; }
   });
@@ -1492,21 +1756,24 @@ export default function App({ initialTab = "overview", instantData = false }) {
     if (refreshing) return;
     setRefreshing(true);
     setNonce((n) => n + 1);
+    reload();
     refreshTimer.current = setTimeout(() => setRefreshing(false), 900);
   };
+  const L = live;
 
   return (
     <div data-theme={theme} className="min-h-screen bg-base font-sans text-hi">
-      <Header tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} refreshing={refreshing} onRefresh={onRefresh} />
+      <Header tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} refreshing={refreshing} onRefresh={onRefresh}
+        src={src} built={L?.generated} tick={L?.ticker} />
       <main key={tab} className="mx-auto max-w-[1440px] animate-rise space-y-4 px-5 py-5">
-        {tab === "overview" && <OverviewTab loading={loading} go={setTab} />}
-        {tab === "attention" && <AttentionTab loading={loading} />}
-        {tab === "predictions" && <PredictionsTab loading={loading} />}
+        {tab === "overview" && <OverviewTab loading={loading} go={setTab} L={L} />}
+        {tab === "attention" && <AttentionTab loading={loading} L={L} />}
+        {tab === "predictions" && <PredictionsTab loading={loading} L={L} />}
         {tab === "sentiment" && <SentimentTab loading={loading} />}
         {tab === "greeks" && <GreeksTab loading={loading} />}
-        {tab === "backtest" && <BacktestTab loading={loading} />}
-        {tab === "benchmarks" && <BenchmarksTab loading={loading} />}
-        {tab === "reports" && <ReportsTab loading={loading} />}
+        {tab === "backtest" && <BacktestTab loading={loading} L={L} />}
+        {tab === "benchmarks" && <BenchmarksTab loading={loading} L={L} />}
+        {tab === "reports" && <ReportsTab loading={loading} L={L} />}
       </main>
       <footer className="border-t border-edge/60 py-5 text-center font-mono text-[9.5px] tracking-[0.14em] text-lo">
         OPTIONEDGE · NIFTY 50 INDEX OPTIONS · DATA 2010-03-22 → 2026-04-10 · ViT FROM SCRATCH (1.83M PARAMS) ·
