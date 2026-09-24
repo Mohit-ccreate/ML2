@@ -1,0 +1,14 @@
+# OptionEdge — regenerable artifacts
+optionedge/results/*.log
+optionedge/results/*.png
+!optionedge/results/hero.png
+__pycache__/
+*.pyc
+
+# web (React terminal) — build artefacts
+web/node_modules/
+web/dist/
+web/dist-smoke/
+
+# python venv (rebuilt by start.sh if missing)
+.venv/

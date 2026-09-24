@@ -1,0 +1,265 @@
+{
+ "period": "2020-01-01..2024-12-31",
+ "n": 1237,
+ "n_buy": 163,
+ "buy_rate_pct": 13.18,
+ "majority_baseline_acc_pct": 86.82,
+ "features": "36 (29 price + 7 synthetic ATM-chain)",
+ "paper_table": {
+  "XGBoost": {
+   "acc": 89.2,
+   "prec": 0.91,
+   "f1": 0.89,
+   "sharpe": 1.78,
+   "total": 196450
+  },
+  "RandomForest": {
+   "acc": 87.4,
+   "prec": 0.88,
+   "f1": 0.86,
+   "sharpe": 1.53,
+   "total": 182300
+  },
+  "LSTM": {
+   "acc": 90.1,
+   "prec": 0.92,
+   "f1": 0.9,
+   "sharpe": 1.95,
+   "total": 205720
+  }
+ },
+ "splits": {
+  "chronological": {
+   "n_train": 870,
+   "n_val": 119,
+   "n_test": 248,
+   "majority_baseline_test_pct": 93.15,
+   "models": {
+    "RandomForest": {
+     "acc_pct": 93.15,
+     "precision_buy": 0.5,
+     "recall_buy": 0.059,
+     "f1_buy": 0.105,
+     "auc": 0.59,
+     "n_test": 248,
+     "n_buy": 17,
+     "backtest": {
+      "final_equity": 94120.46,
+      "total_return_pct": -5.88,
+      "sharpe": 0.21,
+      "max_dd_pct": -29.1,
+      "n_trades": 247,
+      "win_rate_pct": 46.6,
+      "model": "RandomForest"
+     }
+    },
+    "XGBoost": {
+     "acc_pct": 93.15,
+     "precision_buy": 0.0,
+     "recall_buy": 0.0,
+     "f1_buy": 0.0,
+     "auc": 0.5612,
+     "n_test": 248,
+     "n_buy": 17,
+     "backtest": {
+      "final_equity": 97500.56,
+      "total_return_pct": -2.5,
+      "sharpe": 0.26,
+      "max_dd_pct": -20.41,
+      "n_trades": 247,
+      "win_rate_pct": 46.6,
+      "model": "XGBoost"
+     }
+    },
+    "LightGBM(ours)": {
+     "acc_pct": 93.15,
+     "precision_buy": 0.0,
+     "recall_buy": 0.0,
+     "f1_buy": 0.0,
+     "auc": 0.5314,
+     "n_test": 248,
+     "n_buy": 17,
+     "backtest": {
+      "final_equity": 97500.56,
+      "total_return_pct": -2.5,
+      "sharpe": 0.26,
+      "max_dd_pct": -20.41,
+      "n_trades": 247,
+      "win_rate_pct": 46.6,
+      "model": "LightGBM(ours)"
+     }
+    },
+    "XGBoost+CW(ours)": {
+     "acc_pct": 91.13,
+     "precision_buy": 0.222,
+     "recall_buy": 0.118,
+     "f1_buy": 0.154,
+     "auc": 0.518,
+     "n_test": 248,
+     "n_buy": 17,
+     "backtest": {
+      "final_equity": 90053.73,
+      "total_return_pct": -9.95,
+      "sharpe": 0.14,
+      "max_dd_pct": -33.13,
+      "n_trades": 247,
+      "win_rate_pct": 47.0,
+      "model": "XGBoost+CW(ours)"
+     }
+    },
+    "LSTM": {
+     "acc_pct": 93.15,
+     "precision_buy": 0.0,
+     "recall_buy": 0.0,
+     "f1_buy": 0.0,
+     "auc": 0.3934,
+     "n_test": 248,
+     "n_buy": 17,
+     "backtest": {
+      "final_equity": 107901.69,
+      "total_return_pct": 7.9,
+      "sharpe": 0.43,
+      "max_dd_pct": -19.19,
+      "n_trades": 247,
+      "win_rate_pct": 47.4,
+      "model": "LSTM"
+     }
+    },
+    "Stacked(ours)": {
+     "acc_pct": 93.15,
+     "precision_buy": 0.0,
+     "recall_buy": 0.0,
+     "f1_buy": 0.0,
+     "auc": 0.5806,
+     "n_test": 248,
+     "n_buy": 17,
+     "backtest": {
+      "final_equity": 97500.56,
+      "total_return_pct": -2.5,
+      "sharpe": 0.26,
+      "max_dd_pct": -20.41,
+      "n_trades": 247,
+      "win_rate_pct": 46.6,
+      "model": "Stacked(ours)"
+     }
+    }
+   }
+  },
+  "random": {
+   "n_train": 870,
+   "n_val": 119,
+   "n_test": 248,
+   "majority_baseline_test_pct": 83.47,
+   "models": {
+    "RandomForest": {
+     "acc_pct": 83.87,
+     "precision_buy": 0.6,
+     "recall_buy": 0.073,
+     "f1_buy": 0.13,
+     "auc": 0.7487,
+     "n_test": 248,
+     "n_buy": 41,
+     "backtest": {
+      "final_equity": 266228.9,
+      "total_return_pct": 166.23,
+      "sharpe": 1.56,
+      "max_dd_pct": -17.68,
+      "n_trades": 247,
+      "win_rate_pct": 47.8,
+      "model": "RandomForest"
+     }
+    },
+    "XGBoost": {
+     "acc_pct": 83.87,
+     "precision_buy": 0.6,
+     "recall_buy": 0.073,
+     "f1_buy": 0.13,
+     "auc": 0.7078,
+     "n_test": 248,
+     "n_buy": 41,
+     "backtest": {
+      "final_equity": 277017.84,
+      "total_return_pct": 177.02,
+      "sharpe": 1.6,
+      "max_dd_pct": -17.67,
+      "n_trades": 247,
+      "win_rate_pct": 47.8,
+      "model": "XGBoost"
+     }
+    },
+    "LightGBM(ours)": {
+     "acc_pct": 82.26,
+     "precision_buy": 0.333,
+     "recall_buy": 0.073,
+     "f1_buy": 0.12,
+     "auc": 0.6974,
+     "n_test": 248,
+     "n_buy": 41,
+     "backtest": {
+      "final_equity": 202343.31,
+      "total_return_pct": 102.34,
+      "sharpe": 1.24,
+      "max_dd_pct": -34.57,
+      "n_trades": 247,
+      "win_rate_pct": 46.6,
+      "model": "LightGBM(ours)"
+     }
+    },
+    "XGBoost+CW(ours)": {
+     "acc_pct": 77.82,
+     "precision_buy": 0.348,
+     "recall_buy": 0.39,
+     "f1_buy": 0.368,
+     "auc": 0.6788,
+     "n_test": 248,
+     "n_buy": 41,
+     "backtest": {
+      "final_equity": 202316.45,
+      "total_return_pct": 102.32,
+      "sharpe": 1.24,
+      "max_dd_pct": -30.0,
+      "n_trades": 247,
+      "win_rate_pct": 47.4,
+      "model": "XGBoost+CW(ours)"
+     }
+    },
+    "LSTM": {
+     "acc_pct": 85.89,
+     "precision_buy": 0.583,
+     "recall_buy": 0.189,
+     "f1_buy": 0.286,
+     "auc": 0.5989,
+     "n_test": 248,
+     "n_buy": 37,
+     "backtest": {
+      "final_equity": 194208.18,
+      "total_return_pct": 94.21,
+      "sharpe": 1.18,
+      "max_dd_pct": -35.1,
+      "n_trades": 247,
+      "win_rate_pct": 46.6,
+      "model": "LSTM"
+     }
+    },
+    "Stacked(ours)": {
+     "acc_pct": 83.06,
+     "precision_buy": 0.4,
+     "recall_buy": 0.049,
+     "f1_buy": 0.087,
+     "auc": 0.7441,
+     "n_test": 248,
+     "n_buy": 41,
+     "backtest": {
+      "final_equity": 256849.34,
+      "total_return_pct": 156.85,
+      "sharpe": 1.52,
+      "max_dd_pct": -22.89,
+      "n_trades": 247,
+      "win_rate_pct": 47.8,
+      "model": "Stacked(ours)"
+     }
+    }
+   }
+  }
+ }
+}

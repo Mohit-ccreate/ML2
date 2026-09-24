@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OptionEdge — Vision Transformer Options Terminal · NIFTY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="/echarts.min.js"></script>
+<script>window.echarts || document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="bg-aurora" aria-hidden="true"></div>
+<div class="bg-grid" aria-hidden="true"></div>
+<div class="scanline" aria-hidden="true"></div>
+
+<button class="side-toggle" id="sideToggle" aria-label="Toggle navigation">☰</button>
+
+<div class="shell">
+  <!-- ======= SIDEBAR ======= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="side-logo">
+      <div class="logo-mark">⚡</div>
+      <div>
+        <div class="logo">OPTION<span>EDGE</span></div>
+        <div class="logo-sub">NIFTY 50 · ML TERMINAL</div>
+      </div>
+    </div>
+
+    <nav class="side-nav" id="sideNav">
+      <a href="#dashboard" class="on" data-sec="dashboard"><span class="ic">▦</span> Dashboard</a>
+      <a href="#attention" data-sec="attention"><span class="ic">👁</span> Attention</a>
+      <a href="#predictions" data-sec="predictions"><span class="ic">🔮</span> Predictions</a>
+      <a href="#vs" data-sec="vs"><span class="ic">⚖</span> Benchmark</a>
+      <a href="#alpha" data-sec="alpha"><span class="ic">⚡</span> Alpha Straddle</a>
+      <a href="#backtest" data-sec="backtest"><span class="ic">📈</span> Backtest</a>
+      <a href="#research" data-sec="research"><span class="ic">📚</span> Research</a>
+    </nav>
+
+    <div class="side-foot">
+      <button class="theme-btn" id="themeToggle"><span class="ic">☀</span> <span id="themeLbl">Light Mode</span></button>
+      <div class="side-status">
+        <span class="dot" id="sideDot"></span>
+        <div class="side-status-txt">
+          <b id="sideStatusTxt">Connecting…</b>
+          <small id="sideStatusSub">loading state</small>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======= MAIN CONTENT ======= -->
+  <main class="content">
+    <header class="topbar">
+      <div class="topbar-titles">
+        <h1 id="pageTitle">Market Dashboard</h1>
+        <p id="pageSub">Live ViT attention · model scores per protocol</p>
+      </div>
+      <div class="top-actions">
+        <div class="pill mono" id="generated">—</div>
+        <button class="refresh-btn" id="refreshBtn">⟳ Refresh</button>
+        <div class="pill"><span class="dot"></span><span id="topStatusTxt">Online</span></div>
+      </div>
+    </header>
+
+    <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
+
+    <!-- KPI STAT CARDS -->
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <!-- ======= DASHBOARD: MODEL EXPLORER ======= -->
+    <section id="dashboard" class="pane">
+      <div class="panel card">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Model Roster</h2>
+            <p class="panel-sub">Same five models, scored on three honest protocols — filter, search, sort</p>
+          </div>
+          <div class="panel-tools">
+            <div class="search-wrap">
+              <span class="search-ic">🔍</span>
+              <input type="search" id="modelSearch" placeholder="Search models…" autocomplete="off">
+            </div>
+            <div class="sort-wrap">
+              <label for="modelSort">Sort</label>
+              <select id="modelSort">
+                <option value="name">Name</option>
+                <option value="insample">In-sample</option>
+                <option value="oos">Walk-fwd OOS</option>
+                <option value="auc">OOS AUC</option>
+                <option value="return">Return</option>
+                <option value="sharpe">Sharpe</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabs" id="modelTabs">
+          <button class="tab on" data-fam="all">All</button>
+          <button class="tab" data-fam="deep">Deep Learning</button>
+          <button class="tab" data-fam="tree">Tree Models</button>
+          <button class="tab" data-fam="stack">Ensemble</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="roster" id="modelTable">
+            <thead>
+              <tr>
+                <th>MODEL</th><th>TYPE</th><th>IN-SAMPLE</th><th>PAPER 80/20</th>
+                <th>WALK-FWD OOS</th><th>OOS AUC</th><th>OOS RETURN</th><th>SHARPE</th><th>WIN%</th>
+              </tr>
+            </thead>
+            <tbody id="modelTbody"></tbody>
+          </table>
+        </div>
+        <p class="table-note dim mono" id="modelSub"></p>
+      </div>
+    </section>
+
+    <!-- ======= ATTENTION HERO ======= -->
+    <section id="attention" class="pane">
+      <div class="hero">
+        <div class="hero-left card glow">
+          <div class="card-title"><span class="tag">VISION TRANSFORMER</span> Live Attention Feed</div>
+          <div class="attn-box">
+            <img id="heroImg" src="/hero.png" alt="NIFTY chart the ViT is seeing">
+            <div class="attn-overlay" id="attnOverlay"></div>
+            <div class="attn-legend">
+              <div>attention heat — where the ViT looks</div>
+              <div class="attn-scale"><span>low</span><i></i><span>high</span></div>
+            </div>
+          </div>
+          <div class="signal-row">
+            <div class="signal-badge" id="sigBadge">—</div>
+            <div class="prob-bars" id="probBars"></div>
+            <div class="hero-meta mono" id="heroMeta">—</div>
+          </div>
+        </div>
+
+        <div class="hero-right">
+          <h1 class="hero-h1">
+            The market sees charts.<br>
+            <span class="grad">Our ViT learns them.</span>
+          </h1>
+          <p class="hero-p">
+            OptionEdge renders NIFTY 50 price action into candlestick images and trains a
+            <b>Vision Transformer built from scratch</b> to read them — stacked with LSTM,
+            XGBoost &amp; Random Forest, then backtested in real Black-Scholes ATM options.
+            Walk-forward validated, no lookahead, no leak.
+          </p>
+          <div class="kpi-grid" id="kpiGrid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= INTERACTIVE PREDICT: 4 INPUT MODES ======= -->
+    <section id="predictions" class="pane">
+      <div class="card">
+        <div class="card-title"><span class="tag">INTERACTIVE</span> Feed the ViT — four input modes <span class="title-note">every path goes through the exact training chart renderer</span></div>
+
+        <div class="tabs" id="predTabs">
+          <button class="tab on" data-pred="date">🕐 Time Machine</button>
+          <button class="tab" data-pred="data">📋 Your Data</button>
+          <button class="tab" data-pred="scenario">🎰 Scenarios</button>
+          <button class="tab" data-pred="batch">📊 Batch Sweep</button>
+        </div>
+
+        <!-- mode: date -->
+        <div class="pred-pane on" data-pane="date">
+          <div class="vs-grid">
+            <div class="card inner-card">
+              <div class="inner-title">⌕ Ask the ViT about any day</div>
+              <div class="predict-controls mono">
+                <label for="predictDate">SESSION DATE</label>
+                <input type="date" id="predictDate">
+                <button id="predictBtn">RUN ViT →</button>
+              </div>
+              <div class="predict-out" id="predictOut">
+                <div class="predict-img-wrap empty" id="predictWrap">
+                  <img id="predictImg" alt="the 64×64 chart the ViT sees" src="data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=">
+                  <div class="ph" id="predictPh">PICK A DATE →</div>
+                  <div class="attn-overlay" id="predictAttn"></div>
+                </div>
+                <div class="predict-side">
+                  <div class="signal-badge hold" id="predictBadge">—</div>
+                  <div class="prob-bars" id="predictBars"></div>
+                  <div class="hero-meta mono" id="predictMeta">—</div>
+                  <div class="hero-meta mono" id="predictActual">—</div>
+                </div>
+              </div>
+            </div>
+            <div class="card inner-card">
+              <div class="inner-title">What you're looking at</div>
+              <p class="dim">The left image is the exact 64×64 candlestick render the ViT receives for that session — candles, EMA9/21 ribbon and RSI strip, z-scored per day. The pulsing purple grid is the [CLS] token's attention over the 8×8 patch grid: <b>where the model is looking</b>. The three bars are its SELL / HOLD / BUY probabilities for the <b>next</b> session.</p>
+              <p class="dim">Honesty corner: this runs the in-sample fit, so recent dates look confident by construction. The walk-forward OOS numbers in the roster above show what honest generalisation looks like — direction is ~chance, and the vol-expansion straddle is the keep.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- mode: your data -->
+        <div class="pred-pane" data-pane="data">
+          <div class="pred-grid">
+            <div class="pred-in">
+              <label class="mono dim" for="predCsv">one row per day: <b>date,open,high,low,close</b> · ≥26 rows · last row = the day you're asking about · paste or upload a CSV</label>
+              <textarea id="predCsv" rows="10" class="mono" spellcheck="false"
+                placeholder="2026-04-01,24100.5,24250.0,23980.0,24180.5&#10;2026-04-02,24180.5,24320.0,24090.0,24210.0&#10;..."></textarea>
+              <div class="pred-btns">
+                <button id="predFileBtn" class="btn filebtn">📁 upload CSV</button>
+                <input type="file" id="predFile" accept=".csv,.txt" style="display:none">
+                <button id="predLoadBtn" class="btn">⤓ load latest 60d from NIFTY</button>
+                <button id="predGoBtn" class="btn primary">▶ PREDICT MY DATA</button>
+                <span id="predStatus" class="mono dim">paste rows (or load latest / upload), then PREDICT</span>
+              </div>
+              <div class="whatab">
+                <div class="inner-title">WHAT-IF TWIST</div>
+                <p class="dim">Slide to reprice the <b>final close</b> ±2% (high/low adjust to match) — the model re-runs live on the edited path.</p>
+                <div class="twist-row">
+                  <input type="range" id="predTwist" min="-200" max="200" step="1" value="0">
+                  <span class="twist-lbl" id="predTwistLbl">±0.00%</span>
+                </div>
+              </div>
+            </div>
+            <div class="pred-out">
+              <div class="attn-box pred-attn-box">
+                <img id="predImg" alt="the chart the ViT will see" style="display:none;image-rendering:pixelated">
+                <div class="attn-overlay" id="predAttn"></div>
+                <div class="attn-legend">
+                  <div>ViT attention on <i>your</i> input</div>
+                  <div class="attn-scale"><span>low</span><i></i><span>high</span></div>
+                </div>
+              </div>
+              <div class="signal-row">
+                <div class="signal-badge" id="predBadge">—</div>
+                <div class="prob-bars" id="predBars"></div>
+                <div class="hero-meta mono" id="predMeta">waiting for input…</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- mode: scenarios -->
+        <div class="pred-pane" data-pane="scenario">
+          <p class="dim" style="margin-bottom:14px;font-size:14px">Fabricate 40 daily sessions out of thin air (anchored back from the last real session, start ₹24,000)
+          and ask the ViT what happens at the end of a path that <b>never existed</b>.</p>
+          <div class="scen-grid" id="scenGrid">
+            <button class="scen-btn up" data-scen="up">📈 Steady uptrend<span>+0.4%/day drift</span></button>
+            <button class="scen-btn dn" data-scen="down">📉 Steady downtrend<span>−0.4%/day drift</span></button>
+            <button class="scen-btn vol" data-scen="spike">🌪 Vol spike<span>8 wild sessions at the end</span></button>
+            <button class="scen-btn chop" data-scen="chop">📏 Sideways chop<span>alternating ±0.18%</span></button>
+            <button class="scen-btn rnd" data-scen="random">🎰 Random walk<span>σ 0.8%/day</span></button>
+          </div>
+          <details class="pg-details">
+            <summary class="dim mono">last 5 generated rows</summary>
+            <pre id="scenData"></pre>
+          </details>
+        </div>
+
+        <!-- mode: batch -->
+        <div class="pred-pane" data-pane="batch">
+          <p class="dim" style="margin-bottom:14px;font-size:14px">Run the ViT on <b>every session in a range</b> (≤60) and see signal vs. actual day by day — the honest read on daily skill.</p>
+          <div class="batch-ctl">
+            <label class="mono dim">FROM</label>
+            <input type="date" id="batchFrom">
+            <label class="mono dim">TO</label>
+            <input type="date" id="batchTo">
+            <button class="btn primary" id="batchRun">▶ RUN BATCH</button>
+          </div>
+          <div id="batchOut"></div>
+        </div>
+      </div>
+
+      <!-- shared result panel (your data / scenarios / batch-less modes) -->
+      <div class="card" id="pgResultSec" style="display:none;margin-top:22px">
+        <div class="card-title"><span class="tag">RESULT</span> <span id="pgResultTitle" style="letter-spacing:.5px"></span></div>
+        <div class="pred-grid">
+          <div>
+            <div class="attn-box pred-attn-box">
+              <img id="pgImg" alt="the 64×64 chart the ViT saw" style="image-rendering:pixelated">
+              <div class="attn-overlay" id="pgAttn"></div>
+              <div class="attn-legend">
+                <div>ViT attention over the input chart</div>
+                <div class="attn-scale"><span>low</span><i></i><span>high</span></div>
+              </div>
+            </div>
+            <div class="attn-ctl">
+              <label class="mono dim"><input type="checkbox" id="pgAttnOn" checked> show attention</label>
+              <span class="mono dim">opacity <input type="range" id="pgAttnOp" min="0" max="100" value="55"></span>
+            </div>
+          </div>
+          <div class="pg-side">
+            <div class="signal-row">
+              <div class="signal-badge" id="pgBadge">—</div>
+              <div class="prob-bars" id="pgBars"></div>
+            </div>
+            <div class="hero-meta mono" id="pgMeta">—</div>
+            <div class="hero-meta mono" id="pgActual">—</div>
+            <div class="hero-meta mono" id="pgConf">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= VS PAPER ======= -->
+    <section id="vs" class="pane">
+      <div class="card">
+        <div class="card-title"><span class="tag">BENCHMARK</span> OptionEdge vs the Reference Paper <span class="title-note">(Sherasiya 2025, IJFMR)</span></div>
+        <div class="vs-grid">
+          <div class="chart-box"><div class="chart" id="chartVsPaper"></div></div>
+          <div class="vs-right">
+            <div class="card inner-card">
+              <div class="inner-title">⚠ Why the paper's 90% isn't comparable</div>
+              <p id="labelNote" class="dim"></p>
+              <div class="duo">
+                <div class="duo-item"><div class="duo-num" id="paperLabelAcc">—</div><div class="duo-lbl">paper-style label, our XGBoost</div></div>
+                <div class="duo-item"><div class="duo-num" id="majorityAcc">—</div><div class="duo-lbl">majority-class baseline (no model!)</div></div>
+                <div class="duo-item"><div class="duo-num" id="wfAcc">—</div><div class="duo-lbl">our ensemble, honest walk-forward</div></div>
+              </div>
+            </div>
+            <div class="card inner-card">
+              <div class="inner-title">Three protocols, three honest numbers</div>
+              <table class="mini-table" id="protoTable"></table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= ALPHA ======= -->
+    <section id="alpha" class="pane">
+      <div class="card glow-card">
+        <div class="card-title"><span class="tag" style="background:linear-gradient(90deg,var(--mag),var(--cyan))">OPTIONEDGE ALPHA</span> Vol-Expansion Straddle Strategy <span class="title-note" id="alphaPeriod"></span></div>
+        <div class="vs-grid">
+          <div class="chart-box"><div class="chart tall" id="chartAlpha"></div></div>
+          <div class="vs-right">
+            <div class="kpi-grid alpha-kpis" id="alphaKpis"></div>
+            <div class="card inner-card">
+              <div class="inner-title">How it works</div>
+              <p class="dim" style="font-size:13px;line-height:1.6" id="alphaHow"></p>
+            </div>
+            <div class="card inner-card">
+              <div class="inner-title">Per-year OOS accuracy vs base rate</div>
+              <div class="chart short" id="chartAlphaYear"></div>
+            </div>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-top:18px"><table class="trades" id="alphaTrades"></table></div>
+      </div>
+    </section>
+
+    <!-- ======= EQUITY / BACKTEST ======= -->
+    <section id="backtest" class="pane">
+      <div class="card">
+        <div class="card-title"><span class="tag">BACKTEST</span> Directional 1-Day Models — Walk-Forward OOS <span class="title-note" id="wfPeriod"></span></div>
+        <div class="chart tall" id="chartEquity"></div>
+        <div class="chart short" id="chartDD"></div>
+      </div>
+
+      <div class="card" style="margin-top:22px">
+        <div class="vs-grid">
+          <div>
+            <div class="card-title"><span class="tag">P&L</span> Monthly Returns — Ensemble (OOS)</div>
+            <div class="chart" id="chartMonthly"></div>
+          </div>
+          <div>
+            <div class="card-title"><span class="tag">X-RAY</span> Feature Importance — XGBoost</div>
+            <div class="chart" id="chartFeatures"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:22px">
+        <div class="card-title"><span class="tag">TICKER TAPE</span> Recent Ensemble Trades <span class="title-note">(last 90)</span></div>
+        <div class="table-wrap"><table class="trades" id="tradesTable"></table></div>
+      </div>
+    </section>
+
+    <!-- ======= VIT ANATOMY ======= -->
+    <section id="machine" class="pane">
+      <div class="card">
+        <div class="card-title"><span class="tag">MACHINE</span> ViT Anatomy <span class="title-note" id="vitMeta"></span></div>
+        <div class="arch">
+          <div class="arch-step"><div class="arch-ic">🖼</div><div class="arch-name">64×64<br>chart</div></div>
+          <div class="arch-arrow">▸</div>
+          <div class="arch-step"><div class="arch-ic">▦</div><div class="arch-name">64 patches<br>(8×8)</div></div>
+          <div class="arch-arrow">▸</div>
+          <div class="arch-step"><div class="arch-ic">⧉</div><div class="arch-name">linear<br>embed → 192d</div></div>
+          <div class="arch-arrow">▸</div>
+          <div class="arch-step pulse"><div class="arch-ic">🧠</div><div class="arch-name">[CLS] + 65 tokens<br>4× transformer<br>6 heads, pre-LN</div></div>
+          <div class="arch-arrow">▸</div>
+          <div class="arch-step"><div class="arch-ic">∿</div><div class="arch-name">mean pool<br>+ head</div></div>
+          <div class="arch-arrow">▸</div>
+          <div class="arch-step"><div class="arch-ic">🎯</div><div class="arch-name">SELL /<br>HOLD / BUY</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======= METHOD / RESEARCH ======= -->
+    <section id="research" class="pane">
+      <div class="card">
+        <div class="card-title"><span class="tag">METHOD</span> How it works — and what we refuse to fake</div>
+        <div class="method-grid">
+          <div class="method-item"><h4>1 · Data</h4><p id="mData" class="dim"></p></div>
+          <div class="method-item"><h4>2 · Vision</h4><p class="dim">Each day becomes a 64×64 candlestick image (candles, EMA9/21 ribbon, RSI strip). The ViT never sees raw numbers — only the chart, like a human trader.</p></div>
+          <div class="method-item"><h4>3 · Labels</h4><p id="mLabel" class="dim"></p></div>
+          <div class="method-item"><h4>4 · Validation</h4><p class="dim">Expanding walk-forward: train on everything before the year, test on that year (2020→2026). The model has never seen its test days. Ensemble stack fits on train-side probabilities only.</p></div>
+          <div class="method-item"><h4>5 · Backtest</h4><p id="mBt" class="dim"></p></div>
+          <div class="method-item"><h4>6 · Honesty</h4><p class="dim">In-sample fit (what papers usually report), a fair 80/20 time split, <b>and</b> walk-forward OOS — all shown. No cherry-picking, no lookahead, no survivorship. Past performance ≠ future results.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="foot mono">
+      OptionEdge · NIFTY 50 index options · data: NSE via Yahoo Finance mirror (2007–2026) ·
+      ViT implemented from scratch in PyTorch · educational research, not investment advice
+    </footer>
+  </main>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

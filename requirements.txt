@@ -1,0 +1,8 @@
+numpy
+pandas
+scipy
+scikit-learn
+xgboost
+torch>=2.0
+matplotlib
+flask
