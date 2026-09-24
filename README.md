@@ -87,10 +87,12 @@ Direction is coin-flip; **volatility expansion is not**. Next-5-day moves on
 NIFTY are fatter than Parkinson-IV-implied ranges (real |5d moves| average
 ~1.76% vs ~1.73% implied). A walk-forward XGBoost model of
 "will the next 5-day move exceed the IV-implied range?" reaches
-**0.570 AUC** (53.9% accuracy vs 46.2% base rate) strictly out-of-sample,
-year by year (AUC 0.48–0.67 across 2020–2026). Adding **India VIX** — NSE's
-index computed from the NIFTY 50 option chain itself — as features lifts the
-walk-forward AUC to **~0.585–0.59 with a positive lift in every year**
+**0.564 AUC** (53.7% accuracy vs 46.2% base rate) strictly out-of-sample,
+year by year (AUC 0.41–0.67 across 2020–2026; the VIX-era years 2023–25 are
+the strongest). Adding **India VIX** — NSE's
+index computed from the NIFTY 50 option chain itself — as features nearly
+**doubles the walk-forward backtest** (+249% → +424%, Sharpe 1.03 → 1.12),
+and lifts AUC 0.539 → 0.585 on the 2022→26 A/B window
 (`optionedge/vix_experiment.py`; the pipeline picks the VIX columns up
 automatically from `optionedge/data/chain/INDIAVIX.csv`). Traded as a fixed-₹10,000
 long ATM straddle on vol-expansion days (5-day hold, Black-Scholes entry,
@@ -98,12 +100,12 @@ intrinsic-value exit, 0.25% slippage, OOS 2020→2026):
 
 | Strategy | Return | Sharpe | Max DD | Profit factor |
 |---|---|---|---|---|
-| **Alpha straddle (model-timed)** | **+249.3%** | **1.03** | **−25.8%** | **1.44** |
+| **Alpha straddle (model-timed)** | **+424.3%** | **1.12** | **−28.1%** | **1.75** |
 | Straddle every 5 days | +216.7% | 0.74 | −42.9% | 1.23 |
 | Rule "IV < 1-yr median" | +37.1% | 0.33 | — | 0.86 |
 | Buy & Hold (same period) | +86.4% | 0.65 | −38.4% | — |
 
-202 trades, 44.1% win rate, +₹1,234 average P&L per straddle. The payoff is
+214 trades, 47.7% win rate, +₹1,983 average P&L per straddle. The payoff is
 convex (losses capped at the premium, wins are big), and the model beats the
 naive always-on straddle on every risk metric — skipping dead-volatility
 weeks is the only out-of-sample edge in the project that survives scrutiny.

@@ -1586,9 +1586,10 @@ function BenchmarksTab({ loading, L }) {
                   {" "}(Sh {al?.baselines?.["Straddle every 5d"]?.sharpe ?? 0.74}) and B&H {pctS(al?.baselines?.["Buy&Hold (same period)"]?.total_return_pct ?? 86.4)}.
                 </Callout>
                 <Callout tone="cyan" icon={Waves}>
-                  <b className="text-hi">VIX upgrade:</b> adding 7 India-VIX features to the straddle model lifted
-                  walk-fwd AUC from 0.539 to <b className="text-hi">0.585</b> (2022→26 OOS) — chain-implied
-                  vol is a real timing edge for 5-day range events.
+                  <b className="text-hi">VIX upgrade:</b> 7 India-VIX features nearly doubled the straddle's
+                  walk-fwd backtest: {pctS(al?.ret_pct ?? 424.3)} (Sh {al?.sharpe ?? 1.12}, PF {al?.pf ?? 1.75})
+                  {" "}vs +249.3% / 1.03 / 1.44 pre-upgrade. Pooled OOS AUC ≈0.56 with the VIX-era years
+                  (2023–25) the strongest (0.58–0.67); 2022→26 A/B: 0.539 → 0.585.
                 </Callout>
                 <Callout tone="amber" icon={AlertTriangle}>
                   <b className="text-hi">Bottom line:</b> the paper's table is baseline + leakage + bull-market
@@ -1629,7 +1630,7 @@ function ReportsTab({ loading, L }) {
   findings.push({
     n: 5,
     t: "India VIX is the chain-IV edge we were missing",
-    b: `Pre-VIX era (2010–20) the straddle model had no vol-regime input. 7 India-VIX features (level, 252d percentile, vs realized, term spread…) lift walk-fwd AUC 0.539 → 0.585 (2022→26 OOS) with positive lift every single year. Now wired into the training pipeline — ${L?.meta?.n_features ?? 36}-feature dataset.`,
+    b: `Pre-VIX era (2010–20) the straddle model had no vol-regime input. 7 India-VIX features (level, 252d percentile, 1d change…) nearly doubled the walk-fwd backtest: +249% → ${pctS(al?.ret_pct ?? 424.3)} (Sh ${al?.sharpe ?? 1.12}, PF ${al?.pf ?? 1.75}), and VIX features rank top-8 by importance. Wired into the pipeline — ${L?.meta?.n_features ?? 36}-feature dataset.`,
     tone: "amber",
   });
   return (
